@@ -1,5 +1,5 @@
 ; Uncomment for ACME assembler
-; !ifdef x16_inc !eof
+;!ifdef x16_inc !eof
 ; Uncomment for CC65 assembler
 .ifndef cx16_inc
 x16_inc = 1
@@ -122,10 +122,10 @@ Vera_L1Enable		= %00100000
 Vera_ChromaDisable	= %00000100
 Vera_VGAOutput		= %00000001
 
-Vera_TileW8		= %00
-Vera_TileW16		= %01
-Vera_TileH8		= %00
-Vera_TileH16		= %10
+Vera_TileW8		= %00000000
+Vera_TileW16		= %00000001
+Vera_TileH8		= %00000000
+Vera_TileH16		= %00000010
 
 Vera_Scale1X		= 128
 Vera_Scale2X		= 64
