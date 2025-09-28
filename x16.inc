@@ -188,7 +188,7 @@ X16_Reg_R14H		= X16_Reg_R14+1
 X16_Reg_R15		= $20
 X16_Reg_R15L		= X16_Reg_R15
 X16_Reg_R15H		= X16_Reg_R15+1
-
+; Below are not official registers, merely the remaining ZP addresses up to $30
 X16_Reg_X0		= $22
 X16_Reg_X0L		= X16_Reg_X0
 X16_Reg_X0H		= X16_Reg_X0+1
@@ -210,7 +210,7 @@ X16_Reg_X5H		= X16_Reg_X5+1
 X16_Reg_X6		= $2E
 X16_Reg_X6L		= X16_Reg_X6
 X16_Reg_X6H		= X16_Reg_X6+1
-
+; Below are addresses are arbitrary as any ZP address can be used as a pointer 
 X16_PTR_0		= $30
 X16_PTR_1		= $32
 X16_PTR_2		= $34
@@ -237,11 +237,12 @@ X16_YM2151_Data		= $9F41
 X16_ROMBank_Reg		= $01
 X16_RAMBank_Reg		= $00
 
+; ROM Bank definitions
 X16_ROMBank_Kernal	= 0
 X16_ROMBank_Keyboard	= 1
 X16_ROMBank_CBDOS	= 2
 X16_ROMBank_FAT32	= 3
-X16_ROMBank=BASIC	= 4
+X16_ROMBank_BASIC	= 4
 X16_ROMBank_Monitor	= 5
 X16_ROMBank_Charset	= 6
 X16_ROMBank_Diagnostic	= 7
@@ -255,6 +256,7 @@ X16_ROMBank_X16Edit1	= X16_ROMBank_X16Edit
 X16_ROMBank_X16EDit2	= 14
 X16_ROMBank_BASLoad	= 15
 
+; Banked addresses and sizes
 X16_RAM_Window		= $A000
 X16_RAM_WindowSize	= $2000
 X16_ROM_Window		= $C000
@@ -263,6 +265,7 @@ X16_ROM_WindowSize	= $4000
 X16_I2C_SMC		= $42
 X16_I2C_RTC		= $6F
 
+; RAM Vectors
 X16_Vector_IRQ		= $0314
 X16_Vector_CINV		= $0314
 X16_Vector_CBINV	= $0316
@@ -286,6 +289,7 @@ X16_TextMode_ColorPort	= $0376 ; .color in kernal.sym (current color used by BAS
 X16_TextMode_Columns	= $0386 ; .llen in kernal.sym (number of columns in current text mode)
 X16_TextMode_Lines	= $0387 ; .nlines in kernal.sym (number of lines in current text mode)
 
+; SMC Register addresses
 X16_SMCReg_Power	= $01
 X16_SMCReg_Reset	= $02
 X16_SMCReg_NMI		= $03
@@ -303,17 +307,19 @@ X16_SMCReg_MinorVer	= $31
 X16_SMCReg_PatchVer	= $32
 X16_SMCReg_StartBoot	= $8F
 
+; SMC Command codes, these need to be written to correct register to function
 X16_SMCCMD_PowerOff	= $00
 X16_SMCCMD_HardReboot	= $01
 X16_SMCCMD_InjectReset	= $00
 X16_SMCCMD_INjectNMI	= $00
-X16_SMCCMD=LEDOff	= $00
+X16_SMCCMD_LEDOff	= $00
 X16_SMCCMD_LEDOn	= $FF
 X16_SMCCMD_StdMouse	= $00 ; Standard Mouse
 X16_SMCCMD_Intelli	= $03 ; Intellimouse with scroll wheel
 X16_SMCCMD_IntelliPlus	= $04 ; Intellimouse with scroll wheel + extra buttons
 X16_SMCCMD_BootLoader	= $31
 
+; RTC (Real Time Clock) Registers
 X16_RTCReg_ClockSeconds	= $00
 X16_RTCReg_ClockMinutes	= $01
 X16_RTCReg_ClockHours	= $02
@@ -344,6 +350,7 @@ X16_RTCReg_PwrUp_Hours	= $1D
 X16_RTCReg_PwrUp_Day	= $1E
 X16_RTCReg_PwerUp_Month	= $1F
 
+; Screen modes
 X16_ScrMode_80x60	= $00
 X16_ScrMode_80x30	= $01
 X16_ScrMode_40x60	= $02
@@ -360,6 +367,7 @@ X16_ScrMode_320x240	= $80
 X16_ScrMode_640x480	= $81
 X16_ScrMode_Toggle	= $FF
 
+; Definition of the first 16 default colors on the Commander X16
 X16_Color_Black		= 0
 X16_Color_White		= 1
 X16_Color_Red		= 2
@@ -376,7 +384,7 @@ X16_Color_MidGray	= 12
 X16_Color_LightGreen	= 13
 X16_Color_LightBlue	= 14
 X16_Color=LightGray	= 15
-
+; Foreground colors are stored in the lower nibble
 X16_FGColor_Black	= 0
 X16_FGColor_White	= 1
 X16_FGColor_Red		= 2
@@ -393,7 +401,7 @@ X16_FGColor_MidGray	= 12
 X16_FGColor_LightGreen	= 13
 X16_FGColor_LightBlue	= 14
 X16_FGColor=LightGray	= 15
-
+; Background colors are stored in the upper nibble
 X16_BGColor_Black	= 0  << 4
 X16_BGColor_White	= 1  << 4
 X16_BGColor_Red		= 2  << 4
@@ -410,7 +418,7 @@ X16_BGColor_MidGray	= 12 << 4
 X16_BGColor_LightGreen	= 13 << 4
 X16_BGColor_LightBlue	= 14 << 4
 X16_BGColor=LightGray	= 15 << 4
-
+; SNES Buttons
 X16_Joy_B		= $80
 X16_Joy_Y		= $40
 X16_Joy_Select		= $20
@@ -423,7 +431,7 @@ X16_Joy_A		= $80
 X16_Joy_X		= $40
 X16_Joy_LeftShoulder	= $20
 X16_Joy_RightShoulder	= $10
-
+; X16 Kernal functions
 X16_Kernal_ACPTR			= $FFA5
 X16_Kernal_BASIN			= $FFCF
 X16_Kernal_BSAVE			= $FEBA
@@ -531,6 +539,7 @@ X16_Kernal_UDTIM			= $FFEA
 X16_Kernal_UNLSN			= $FFAE
 X16_Kernal_UNTLK			= $FFAB
 
+; PET Color Codes
 PET_Color_Black		= $90
 PET_Color_White		= $05
 PET_Color_RED		= $1C
@@ -547,7 +556,7 @@ PET_Color_MidGray	= $98
 PET_Color_LightGreen	= $99
 PET_Color_LightBlue	= $9A
 PET_Color_LightGray	= $9B
-
+; PET Control Codes
 PET_Ctrl_SwapFGBG	= $01
 PET_Ctrl_Stop		= $03
 PET_Ctrl_Underline	= $04
