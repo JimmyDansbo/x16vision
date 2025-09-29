@@ -383,7 +383,7 @@ X16_Color_DargGray	= 11
 X16_Color_MidGray	= 12
 X16_Color_LightGreen	= 13
 X16_Color_LightBlue	= 14
-X16_Color=LightGray	= 15
+X16_Color_LightGray	= 15
 ; Foreground colors are stored in the lower nibble
 X16_FGColor_Black	= 0
 X16_FGColor_White	= 1
@@ -400,7 +400,7 @@ X16_FGColor_DargGray	= 11
 X16_FGColor_MidGray	= 12
 X16_FGColor_LightGreen	= 13
 X16_FGColor_LightBlue	= 14
-X16_FGColor=LightGray	= 15
+X16_FGColor_LightGray	= 15
 ; Background colors are stored in the upper nibble
 X16_BGColor_Black	= 0  << 4
 X16_BGColor_White	= 1  << 4
@@ -417,7 +417,7 @@ X16_BGColor_DargGray	= 11 << 4
 X16_BGColor_MidGray	= 12 << 4
 X16_BGColor_LightGreen	= 13 << 4
 X16_BGColor_LightBlue	= 14 << 4
-X16_BGColor=LightGray	= 15 << 4
+X16_BGColor_LightGray	= 15 << 4
 ; SNES Buttons
 X16_Joy_B		= $80
 X16_Joy_Y		= $40
