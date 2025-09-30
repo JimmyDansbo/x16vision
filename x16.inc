@@ -1,7 +1,7 @@
 ; Uncomment for ACME assembler
 ;!ifdef x16_inc !eof
 ; Uncomment for CC65 assembler
-.ifndef cx16_inc
+.ifndef x16_inc
 x16_inc = 1
 
 Vera_Reg_AddrL		= $9F20
