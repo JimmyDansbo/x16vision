@@ -8,7 +8,7 @@ RMDIR	:= rmdir -p
 ASFLAGS	:= --cpu 65C02 -g
 SRCS	:= $(wildcard *.s)
 OBJS    := $(patsubst %.s,%.o,$(SRCS))
-BIN     := x16vision.bin
+BIN     := X16VISION.BIN
 MAPFILE := ./$(PROJECT).map
 SYMFILE := ./$(PROJECT).sym
 
