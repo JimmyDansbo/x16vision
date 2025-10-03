@@ -25,4 +25,4 @@ $(BIN): $(OBJS)
 
 .PHONY: clean run
 clean:
-	$(RM) $(OBJS) $(BIN)
+	$(RM) $(OBJS) $(BIN) $(MAPFILE) $(SYMFILE)
