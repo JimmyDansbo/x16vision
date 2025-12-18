@@ -9,3 +9,7 @@
 *.bin
 *.BIN
 
+# Program files
+*.prg
+*.PRG
+
