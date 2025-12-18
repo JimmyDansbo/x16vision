@@ -9,7 +9,6 @@ X16VISION_VERSION = $0001
 	jmp	xv_initialize	; $A000
 	jmp	xv_setisr	; $A003
 	jmp	xv_clearisr	; $A006
-	jmp	xv_desktop	; $A009
 
 ; Internal jump table into lowram functions
 lda_bank:
@@ -25,7 +24,7 @@ stay_bank:
 
 .segment "XVKITBSS"
 
-; Lowram address provided by the user to copy ISR routine to.
+; Lowram address provided by the user to copy routines to.
 lowram_addr:	.res 2
 ; Object handled by library are in a linked list, this points to the start of the list.
 init_obj_addr:	.res 2
@@ -147,7 +146,7 @@ OP_RTS=$60	; Opcode for RTS
 .endproc
 
 ;*****************************************************************************
-; Zeroes out variable space, copies ISR to lowram and ensures ISR loads 
+; Zeroes out variable space, copies functions to lowram and ensures ISR loads 
 ; correct RAM bank before calling xv_tick to actually handle the interrupt.
 ;=============================================================================
 ; Arguments: A and X are low- and high-byte of lowram address reserved for
