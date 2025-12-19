@@ -32,8 +32,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; USES:			.A, .X & ,Y
 ; RETURNS:		.C = 1 in case of error.
 ; *****************************************************************************
-.macro VTUI_SCREEN_SET
-	jsr	vtui_screen_set
+.macro VTUI_SCREENSET
+	jsr	vtui_screenset
 .endmacro
 
 ; *****************************************************************************
@@ -42,8 +42,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.C = Bank number, 0 or 1
 ; USES:		.A
 ; *****************************************************************************
-.macro VTUI_SET_BANK
-	jsr	vtui_set_bank
+.macro VTUI_SETBANK
+	jsr	vtui_setbank
 .endmacro
 
 ; *****************************************************************************
@@ -52,8 +52,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; USES:		.A
 ; RETURNS:	.C = Bank number, 0 or 1
 ; *****************************************************************************
-.macro VTUI_GET_BANK
-	jsr	vtui_get_bank
+.macro VTUI_GETBANK
+	jsr	vtui_getbank
 .endmacro
 
 ; *****************************************************************************
@@ -62,8 +62,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUT:		.A = Stride value
 ; USES:			r0l
 ; *****************************************************************************
-.macro VTUI_SET_STRIDE
-	jsr	vtui_set_stride
+.macro VTUI_SETSTRIDE
+	jsr	vtui_setstride
 .endmacro
 
 ; *****************************************************************************
@@ -71,8 +71,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; *****************************************************************************
 ; RETURNS:		.A = stride value
 ; *****************************************************************************
-.macro VTUI_GET_STRIDE
-	jsr	vtui_get_stride
+.macro VTUI_GETSTRIDE
+	jsr	vtui_getstride
 .endmacro
 
 ; *****************************************************************************
@@ -81,8 +81,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUT:		.C (1 = decrement, 0 = increment)
 ; USES:			.A
 ; *****************************************************************************
-.macro VTUI_SET_DECR
-	jsr	vtui_set_decr
+.macro VTUI_SETDECR
+	jsr	vtui_setdecr
 .endmacro
 
 ; *****************************************************************************
@@ -91,8 +91,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; USES:			.A
 ; RETURNS:		.C (1 = decrement, 0 = increment)
 ; *****************************************************************************
-.macro VTUI_GET_DECR
-	jsr	vtui_get_decr
+.macro VTUI_GETDECR
+	jsr	vtui_getdecr
 .endmacro
 
 ; *****************************************************************************
@@ -103,8 +103,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X = bg-/fg-color
 ; USES:		.A
 ; *****************************************************************************
-.macro VTUI_PLOT_CHAR
-	jsr	vtui_plot_char
+.macro VTUI_PLOTCHAR
+	jsr	vtui_plotchar
 .endmacro
 
 ; *****************************************************************************
@@ -115,8 +115,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X = bg-/fg-color
 ; USES		.X
 ; *****************************************************************************
-.macro VTUI_SCAN_CHAR
-	jsr	vtui_scan_char
+.macro VTUI_SCANCHAR
+	jsr	vtui_scanchar
 .endmacro
 
 ; *****************************************************************************
@@ -181,8 +181,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X  = bg-/fg color (only used if stride=0,decr=0&bank=0)
 ; USES:		.A, .Y & r1
 ; *****************************************************************************
-.macro VTUI_PRINT_STR
-	jsr	vtui_print_str
+.macro VTUI_PRINTSTR
+	jsr	vtui_printstr
 .endmacro
 
 ; *****************************************************************************
@@ -193,8 +193,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r2l	= Height of box
 ;		.X	= bg- & fg-color
 ; *****************************************************************************
-.macro VTUI_FILL_BOX
-	jsr	vtui_fill_box
+.macro VTUI_FILLBOX
+	jsr	vtui_fillbox
 .endmacro
 
 ; *****************************************************************************
@@ -204,8 +204,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X	= bg- & fg-color
 ; USES:		.Y, r1l & r2l
 ; *****************************************************************************
-.macro VTUI_CLR_SCR
-	jsr	vtui_clr_scr
+.macro VTUI_CLRSCR
+	jsr	vtui_clrscr
 .endmacro
 
 ; *****************************************************************************
@@ -232,8 +232,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r2l	= height
 ; USES:		r1h
 ; *****************************************************************************
-.macro VTUI_SAVE_RECT
-	jsr	vtui_save_rect
+.macro VTUI_SAVERECT
+	jsr	vtui_saverect
 .endmacro
 
 ; *****************************************************************************
@@ -246,8 +246,8 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r1l	= width
 ;		r2l	= height
 ; *****************************************************************************
-.macro VTUI_REST_RECT
-	jsr	vtui_rest_rect
+.macro VTUI_RESTRECT
+	jsr	vtui_restrect
 .endmacro
 
 ; *****************************************************************************
@@ -259,8 +259,8 @@ vtui_getdecr	= VTUI_LIB+62
 ; OUPUTS:	.Y = actual length of input
 ; USES:		.A & r1
 ; *****************************************************************************
-.macro VTUI_INPUT_STR
-	jsr	vtui_input_str
+.macro VTUI_INPUTSTR
+	jsr	vtui_inputstr
 .endmacro
 
 VTUI:	.incbin	"VTUI1.2.BIN"
