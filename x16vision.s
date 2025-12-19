@@ -1,5 +1,6 @@
 .include "x16.inc"
 .include "macros.inc"
+.include "vtui.inc"
 
 .import __XVKIT_LOWRAM_SIZE__, __XVKITBSS_SIZE__, __XVKITBSS_LOAD__
 
@@ -9,6 +10,7 @@ X16VISION_VERSION = $0001
 	jmp	xv_initialize	; $A000
 	jmp	xv_setisr	; $A003
 	jmp	xv_clearisr	; $A006
+	jmp	xv_desktop	; $A009
 
 ; Internal jump table into lowram functions
 lda_bank:
@@ -46,7 +48,6 @@ OP_RTS=$60	; Opcode for RTS
 ;=============================================================================
 ;*****************************************************************************
 .proc	xv_tick: near
-	.byte $db
 	; Check if address is all 0s
 	lda	init_obj_addr
 	ora	init_obj_addr+1
@@ -56,6 +57,16 @@ OP_RTS=$60	; Opcode for RTS
 
 	RESTORE_PTR X16_PTR_0
 @end:	rts
+.endproc
+
+;*****************************************************************************
+;=============================================================================
+;*****************************************************************************
+.proc	xv_desktop: near
+	lda	#$66
+	ldx	#$0F
+	jsr	vtui_clrscr
+	rts
 .endproc
 
 ;*****************************************************************************
@@ -246,6 +257,8 @@ OP_RTS=$60	; Opcode for RTS
 	lda	#0
 	adc	lowram_addr+1
 	sta	stay_bank+2
+
+	jsr	vtui_initialize
 
 	ply	; Restore Y
 	rts

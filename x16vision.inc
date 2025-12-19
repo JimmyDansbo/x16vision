@@ -5,6 +5,7 @@
 xv_initialize	= $A000 ; Initialize the library
 xv_setisr	= $A003 ; Install interrupt handler
 xv_clearisr	= $A006	; Restore old interrupt handler
+xv_desktop	= $A009 ; Create the desktop, set screen, charset, background pattern and color
 
 xv_bank_offset	= 11	; Offset from the lowram address where the RAM bank is stored
 
