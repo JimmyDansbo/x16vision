@@ -29,4 +29,8 @@ macros_inc=1
 	sta	ptr
 .endmacro
 
+.macro DEBUG_STOP
+	.byte	$DB
+.endmacro
+
 .endif
