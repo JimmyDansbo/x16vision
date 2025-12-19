@@ -9,3 +9,6 @@ xv_desktop	= $A009 ; Create the desktop, set screen, charset, background pattern
 
 xv_bank_offset	= 11	; Offset from the lowram address where the RAM bank is stored
 
+XV_ERR_NOERR		= $00
+XV_ERR_WRONGROM		= $01
+XV_ERR_PRERELROM	= $02

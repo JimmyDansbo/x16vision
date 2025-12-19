@@ -2,9 +2,15 @@
 .include "macros.inc"
 .include "vtui.inc"
 
+; Error codes
+XV_NOERR	= $00
+XV_WRONGROM	= $01
+XV_PRERELROM	= $02
+
 .import __XVKIT_LOWRAM_SIZE__, __XVKITBSS_SIZE__, __XVKITBSS_LOAD__
 
-X16VISION_VERSION = $0001
+X16VISION_VERSION	= $0001
+MINIMUM_ROMVERSION	= 48
 
 .segment "JUMPTABLE"
 	jmp	xv_initialize	; $A000
@@ -63,8 +69,14 @@ OP_RTS=$60	; Opcode for RTS
 ;=============================================================================
 ;*****************************************************************************
 .proc	xv_desktop: near
-	lda	#$66
-	ldx	#$0F
+;	lda	#$66
+;	ldx	#$0F
+	pha
+	lda	#1
+	jsr	vtui_setstride
+	clc
+	jsr	vtui_setdecr
+	pla
 	jsr	vtui_clrscr
 	rts
 .endproc
@@ -157,6 +169,24 @@ OP_RTS=$60	; Opcode for RTS
 .endproc
 
 ;*****************************************************************************
+; Reads out the ROM version from address $FF80 in ROM bank 0
+;=============================================================================
+; Preserves: X and Y
+; Returns: current ROM version in A
+;*****************************************************************************
+.proc	getromver: near
+	phy
+	ldy	X16_ROMBank_Reg
+	stz	X16_ROMBank_Reg
+	lda	$FF80
+	sty	X16_ROMBank_Reg
+	ply
+	pha	; Push and Pull A to ensure N flag is correct
+	pla
+	rts
+.endproc
+
+;*****************************************************************************
 ; Zeroes out variable space, copies functions to lowram and ensures ISR loads 
 ; correct RAM bank before calling xv_tick to actually handle the interrupt.
 ;=============================================================================
@@ -164,14 +194,39 @@ OP_RTS=$60	; Opcode for RTS
 ;            the x16vision library
 ;-----------------------------------------------------------------------------
 ; Preserves: X and Y
-; Returns: (none)
+; Returns: Carry set on error, A = error code
 ;*****************************************************************************
 .proc	xv_initialize: near
+	sta	lowram_addr	; Write low byte of lowram address to mem
+	; Ensure that we are are on a supported ROM
+	jsr	getromver
+	bmi	@isprerelease
+	sta	lowram_addr+1	; Save ROM version temporarily
+	lda	#XV_NOERR	; Push NOERR onto stack
+	pha
+	lda	lowram_addr+1	; Restore ROM version to A
+	cmp	#MINIMUM_ROMVERSION
+	bcs	@continue
+	pla			; clear stack
+	lda	#XV_WRONGROM
+	sec
+	rts
+@isprerelease:
+	sta	lowram_addr+1	; Save ROM version temporarily
+	lda	#XV_PRERELROM	; Push Pre Release ROM warning onto stack
+	pha
+	lda	lowram_addr+1	; Restore ROM version to A
+	eor	#$FF
+	cmp	#MINIMUM_ROMVERSION
+	bcs	@continue
+	pla			; clear stack
+	lda	#XV_WRONGROM
+	sec
+	rts
+@continue:
 	phy	; Preserve Y
-	tay	; Save low byte of lowram address in Y
-	; Save ZP ptr to stack
+	; Save ZP ptr
 	SAVE_PTR X16_PTR_0
-	phy	; Save low byte of lowram on stack
 
 	; Set ZP ptr to address of variables
 	lda	#<__XVKITBSS_LOAD__
@@ -194,9 +249,8 @@ OP_RTS=$60	; Opcode for RTS
 	lda	#>(X16_RAM_Window+X16_RAM_WindowSize-START_OF_LINKED_LIST)
 	sta	rem_space+1
 
-	pla	; Restore low byte of lowram from stack
-	; Save low byte of lowram address and write it to ZP ptr
-	sta	lowram_addr
+	; Write low byte of lowram address to ZP ptr
+	lda	lowram_addr
 	sta	X16_PTR_0
 	; Save high byte of lowram address and write it to ZP ptr
 	stx	lowram_addr+1
@@ -261,6 +315,8 @@ OP_RTS=$60	; Opcode for RTS
 	jsr	vtui_initialize
 
 	ply	; Restore Y
+	pla	; Get err/warn code from stack
+	clc	; Clear carry to to show initialization successfull
 	rts
 .endproc
 
