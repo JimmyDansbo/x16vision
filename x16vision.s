@@ -16,16 +16,18 @@ MINIMUM_ROMVERSION	= 48
 	jmp	_xv_statusbar	; $A00C
 
 ; Internal jump table into lowram functions
-lda_bank:
+; The bank-load and store functions use X16_PTR_0 for the address and X for bank
+lda_bank:		; Return byte in A
 	jmp	$0000
-ldxa_bank:
+lday_bank:		; Return lowbyte in A, highbyte in Y
 	jmp	$0000
-ldyxa_bank:
+ldyxa_bank:		; Return lowbyte in Y, midbyte in X , highbyte in A
 	jmp	$0000
-sta_bank:
+sta_bank:		; Store value in A
 	jmp	$0000
-stay_bank:
+stay_bank:		; Store A to lowbyte, Y to highbyte
 	jmp	$0000
+
 check_bank_remspace:
 	jmp	$0000
 
@@ -39,8 +41,8 @@ init_obj_bank:	.res 1
 ; This points to the latest object for ease of adding objects.
 last_obj_addr:	.res 2
 last_obj_bank:	.res 1
-; Space reserved for saving ZP pointer before using it
-preserve_ptr:	.res 2
+; Space reserved for saving ZP pointers before using them
+preserve_ptr:	.res 4
 ; Space reserved for the desktop information
 desktop:	.res XV_DESKTOP_STRUCT_SIZE
 ; Variable holding amount of free space in the bank
@@ -67,7 +69,12 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 .endproc
 
 ;*****************************************************************************
+;
 ;=============================================================================
+; Inputs:	placement = top or bottom + text alignment right, left, center
+;		color
+;		highlight color
+;		max text length
 ;*****************************************************************************
 .proc	_xv_statusbar: near
 	GATE_THIS_FUNCTION
@@ -377,7 +384,8 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 @zloop:
 	sta	(X16_PTR_0),y
 	dey
-	bpl	@zloop
+	bne	@zloop
+	sta	(X16_PTR_0)
 
 	; Calculate the remaining free space in the current bank and store
 	; the value in the rem_space variable - this is the amount of
@@ -404,7 +412,9 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	lda	_isr,y
 	sta	(X16_PTR_0),y
 	dey
-	bpl	@loop
+	bne	@loop
+	lda	_isr
+	sta	(X16_PTR_0)
 
 	; Restore ZP ptr
 	RESTORE_PTR X16_PTR_0
@@ -419,13 +429,13 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	adc	lowram_addr+1
 	sta	lda_bank+2
 
-	lda	#(_ldxa_bank-_isr)
+	lda	#(_lday_bank-_isr)
 	clc
 	adc	lowram_addr
-	sta	ldxa_bank+1
+	sta	lday_bank+1
 	lda	#0
 	adc	lowram_addr+1
-	sta	ldxa_bank+2
+	sta	lday_bank+2
 
 	lda	#(_ldyxa_bank-_isr)
 	clc
@@ -547,21 +557,21 @@ _lda_bank:
 ; Arguments: X16_PTR_0, ZP pointer to the memory address that should be read
 ;            .X holds the RAM bank to read from
 ;-----------------------------------------------------------------------------
-; Preserves: .Y and the RAM bank before call
-; Returns: .X contains value from ZP pointer, .A from ZP pointer + 1
+; Preserves: X & X16_PTR_0
+; Returns: .A contains value from ZP pointer, .Y from ZP pointer + 1
 ;*****************************************************************************
-_ldxa_bank:
-	phy			; Preserve .Y
-	ldy	X16_RAMBank_Reg	; Save current RAM bank to stack
-	phy
-	ldy	#1		; Initialize .Y for reading value through ZP pointer
-	stx	X16_RAMBank_Reg	; Set new RAM bank
-	lda	(X16_PTR_0)	; Load value from address pointed to by ZP pointer
-	tax			; Store the value in .X
-	lda	(X16_PTR_0),y	; Load next value from address pointed to by ZP pointer with .Y added
-	ply			; Restore RAM bank from stack
-	sty	X16_RAMBank_Reg
-	ply			; Restore .Y
+_lday_bank:
+	phx			; Preserve X
+	ldy	X16_RAMBank_Reg	; Save original RAM bank
+	stx	X16_RAMBank_Reg	; Switch RAM bank
+	phy			; Move original RAM bank through stack to X
+	plx
+	ldy	#1		; Read highbyte into Y
+	lda	(X16_PTR_0),y
+	tay
+	lda	(X16_PTR_0)	; Read lowbyte into A
+	stx	X16_RAMBank_Reg	; Restore original RAM bank
+	plx			; Restore X
 	rts
 
 ;*****************************************************************************
@@ -618,22 +628,26 @@ _sta_bank:
 ;            .X holds the RAM bank to write to
 ;	     .A & .Y holds the values to write in that order (low-high)
 ;-----------------------------------------------------------------------------
-; Preserves: The RAM bank before call
+; Preserves: A, X, Y & The RAM bank before call
 ; Returns: nothing
 ;*****************************************************************************
 _stay_bank:
-	pha			; Preserve value in .A
+	pha			; Preserve A register
+	pha			; Preserve low byte
 	lda	X16_RAMBank_Reg	; Save current RAM bank in .A
 	stx	X16_RAMBank_Reg	; Set the new RAM bank
-	plx			; Pull .A value from stack and store it in .X temporarily
+	plx			; Pull .low byte from stack and store it in .X temporarily
 	pha			; Push original RAM bank to stack
-	txa			; Move .A value from .X back to .A
-	sta	(X16_PTR_0)	; Store value in .A to address pointed to by ZP pointer
-	tya			; Store value in .Y to address pointed to by ZP pointer with .Y added
+	txa			; Move low byte from .X back to .A
+	sta	(X16_PTR_0)	; Store low byte to address pointed to by ZP pointer
+	tya			; Store high byte to address pointed to by ZP pointer with .Y added
 	ldy	#1
 	sta	(X16_PTR_0),y
-	pla			; Restore RAM bank
+	tay			; Restore high byte to Y
+	ldx	X16_RAMBank_Reg	; Restore RAM bank value from the call
+	pla			; Restore RAM bank to original
 	sta	X16_RAMBank_Reg
+	pla			; Restore A register
 	rts
 
 ;*****************************************************************************
