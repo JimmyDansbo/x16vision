@@ -1,11 +1,19 @@
 .ifndef macros_inc
 macros_inc=1
 
-.macro SAVE_PTR ptr
+.macro SAVE_PTR ptr, offset
 	lda	ptr
-	sta	preserve_ptr
+	.ifnblank offset
+		sta	preserve_ptr+offset
+	.else
+		sta	preserve_ptr
+	.endif
 	lda	ptr+1
-	sta	preserve_ptr+1
+	.ifnblank offset
+		sta	preserve_ptr+offset+1
+	.else
+		sta	preserve_ptr+1
+	.endif
 .endmacro
 
 .macro STACK_SAVE_PTR ptr
@@ -15,10 +23,18 @@ macros_inc=1
 	pha
 .endmacro
 
-.macro RESTORE_PTR ptr
-	lda	preserve_ptr
+.macro RESTORE_PTR ptr, offset
+	.ifnblank offset
+		lda	preserve_ptr+offset
+	.else
+		lda	preserve_ptr
+	.endif
 	sta	ptr
-	lda	preserve_ptr+1
+	.ifnblank offset
+		lda	preserve_ptr+offset+1
+	.else
+		lda	preserve_ptr+1
+	.endif
 	sta	ptr+1
 .endmacro
 
