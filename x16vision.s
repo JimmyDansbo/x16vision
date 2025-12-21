@@ -1,20 +1,7 @@
 .include "x16.inc"
 .include "macros.inc"
 .include "vtui.inc"
-
-; Error codes
-XV_NOERR	= $00
-XV_WRONGROM	= $01
-XV_PRERELROM	= $02
-XV_UNINIT	= $03
-XV_NOMEM	= $04
-
-; Memory stuctures
-XV_DESKTOP_CHAR		= 0
-XV_DESKTOP_COL		= 1
-XV_DESKTOP_WIDTH	= 2
-XV_DESKTOP_HEIGHT	= 3
-XV_DESKTOP_STRUCT_SIZE	= 4
+.include "x16vision.inc"
 
 .import __XVKIT_LOWRAM_SIZE__, __XVKITBSS_SIZE__, __XVKITBSS_LOAD__
 
@@ -22,10 +9,11 @@ X16VISION_VERSION	= $0001
 MINIMUM_ROMVERSION	= 48
 
 .segment "JUMPTABLE"
-	jmp	xv_initialize	; $A000
-	jmp	xv_setisr	; $A003
-	jmp	xv_clearisr	; $A006
-	jmp	xv_desktop	; $A009
+	jmp	_xv_initialize	; $A000
+	jmp	_xv_setisr	; $A003
+	jmp	_xv_clearisr	; $A006
+	jmp	_xv_desktop	; $A009
+	jmp	_xv_statusbar	; $A00C
 
 ; Internal jump table into lowram functions
 lda_bank:
@@ -60,9 +48,8 @@ rem_space:	.res 2
 
 START_OF_LINKED_LIST = *
 .segment "XVKITLIB"
-OP_NOP=$EA	; Opcode for NOP
-OP_RTS=$60	; Opcode for RTS
 OP_BRA=$80	; Opcode for BRA
+OP_LDA_IMM=$A9	; Opcode for LDA #
 
 ;*****************************************************************************
 ;=============================================================================
@@ -77,6 +64,14 @@ OP_BRA=$80	; Opcode for BRA
 
 	RESTORE_PTR X16_PTR_0
 @end:	rts
+.endproc
+
+;*****************************************************************************
+;=============================================================================
+;*****************************************************************************
+.proc	_xv_statusbar: near
+	GATE_THIS_FUNCTION
+	rts
 .endproc
 
 ;*****************************************************************************
@@ -117,7 +112,7 @@ OP_BRA=$80	; Opcode for BRA
 ;	 Background char= A
 ;	 Color		= X
 ;*****************************************************************************
-.proc	xv_desktop: near
+.proc	_xv_desktop: near
 	GATE_THIS_FUNCTION
 	sta	desktop+XV_DESKTOP_CHAR
 	stx	desktop+XV_DESKTOP_COL
@@ -222,13 +217,14 @@ OP_BRA=$80	; Opcode for BRA
 ;=============================================================================
 ; Preserves X register
 ;*****************************************************************************
-.proc	xv_setisr: near
+.proc	_xv_setisr: near
 	GATE_THIS_FUNCTION
 
-	lda	#OP_NOP		; NOP
-	sta	xv_clearisr+3	; Ungate xv_clearisr
-	lda	#OP_RTS		; RTS
-	sta	xv_setisr+3	; Gate xv_setisr
+	; Ungate clearisr function and gate this one
+	lda	#OP_BRA
+	sta	_xv_clearisr
+	lda	#OP_LDA_IMM
+	sta	_xv_setisr
 
 	; Save ZP ptr to stack
 	SAVE_PTR X16_PTR_0
@@ -271,13 +267,14 @@ OP_BRA=$80	; Opcode for BRA
 ;=============================================================================
 ; Preserves X register
 ;*****************************************************************************
-.proc	xv_clearisr: near
+.proc	_xv_clearisr: near
 	GATE_THIS_FUNCTION
 
-	lda	#OP_NOP		; NOP
-	sta	xv_setisr+3	; Ungate xv_setisr
-	lda	#OP_RTS		; RTS
-	sta	xv_clearisr+3	; Gate xv_clearisr
+	; Ungate setisr function and gate this one
+	lda	#OP_BRA
+	sta	_xv_setisr
+	lda	#OP_LDA_IMM
+	sta	_xv_clearisr
 
 	; Save ZP ptr to stack
 	SAVE_PTR X16_PTR_0
@@ -335,7 +332,7 @@ OP_BRA=$80	; Opcode for BRA
 ; Preserves: X and Y
 ; Returns: Carry set on error, A = error code
 ;*****************************************************************************
-.proc	xv_initialize: near
+.proc	_xv_initialize: near
 	sta	lowram_addr	; Save low byte of lowram address to mem
 	; Ensure that we are are on a supported ROM
 	jsr	getromver
@@ -475,14 +472,19 @@ OP_BRA=$80	; Opcode for BRA
 
 .proc	ungate: near
 	lda	#OP_BRA
-	sta	xv_clearisr
-	sta	xv_setisr
-	sta	xv_desktop
+	sta	_xv_setisr
+	sta	_xv_desktop
+	sta	_xv_statusbar
 	lda	#2
-	sta	xv_setisr+1
-	sta	xv_desktop+1
-	lda	#3
-	sta	xv_clearisr+1
+	sta	_xv_setisr+1
+	sta	_xv_clearisr+1
+	sta	_xv_desktop+1
+	sta	_xv_statusbar+1
+
+	; _xv_clearisr function is still gated as the BRA opcode has not been
+	; written to the start of the function.
+	; This means that clearisr reads the error code 2 = XV_DONE_ALREADY
+	; into A and returns with Carry set.
 	rts
 .endproc
 
