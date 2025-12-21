@@ -6,6 +6,15 @@
 XV_NOERR	= $00
 XV_WRONGROM	= $01
 XV_PRERELROM	= $02
+XV_UNINIT	= $03
+XV_NOMEM	= $04
+
+; Memory stuctures
+XV_DESKTOP_CHAR		= 0
+XV_DESKTOP_COL		= 1
+XV_DESKTOP_WIDTH	= 2
+XV_DESKTOP_HEIGHT	= 3
+XV_DESKTOP_STRUCT_SIZE	= 4
 
 .import __XVKIT_LOWRAM_SIZE__, __XVKITBSS_SIZE__, __XVKITBSS_LOAD__
 
@@ -42,6 +51,8 @@ last_obj_addr:	.res 2
 last_obj_bank:	.res 1
 ; Space reserved for saving ZP pointer before using it
 preserve_ptr:	.res 2
+; Space reserved for the desktop information
+desktop:	.res XV_DESKTOP_STRUCT_SIZE
 ; Variable holding amount of free space in the bank
 rem_space:	.res 2
 
@@ -49,6 +60,7 @@ START_OF_LINKED_LIST = *
 .segment "XVKITLIB"
 OP_NOP=$EA	; Opcode for NOP
 OP_RTS=$60	; Opcode for RTS
+OP_BRA=$80	; Opcode for BRA
 
 ;*****************************************************************************
 ;=============================================================================
@@ -66,19 +78,115 @@ OP_RTS=$60	; Opcode for RTS
 .endproc
 
 ;*****************************************************************************
+; Create, draw and save information about the desktop element which must be
+; the first element created by the library
 ;=============================================================================
+; Input: Screen Mode	= R0L
+;	 Character Set	= R0H
+;	 Output mode	= R1L
+;	 Background char= A
+;	 Color		= X
 ;*****************************************************************************
 .proc	xv_desktop: near
-;	lda	#$66
-;	ldx	#$0F
-	pha
+	GATE_THIS_FUNCTION
+	sta	desktop+XV_DESKTOP_CHAR
+	stx	desktop+XV_DESKTOP_COL
+	
+	lda	X16_Reg_R0L	; Load Screen Mode
+	clc
+	jsr	X16_Kernal_screen_mode
+	sec
+	jsr	X16_Kernal_screen_mode
+	sty	desktop+XV_DESKTOP_HEIGHT
+	stx	desktop+XV_DESKTOP_WIDTH
+
+	lda	X16_Reg_R0H	; Load character set
+	jsr	X16_Kernal_screen_set_charset
+	lda	X16_Reg_R1L	; Load output mode
+	and	#$0F		; Ensure only low nibble is set
+	ora	Vera_Reg_DCVideo
+	sta	Vera_Reg_DCVideo
+
 	lda	#1
 	jsr	vtui_setstride
 	clc
 	jsr	vtui_setdecr
-	pla
+	lda	desktop+XV_DESKTOP_CHAR
+	ldx	desktop+XV_DESKTOP_COL
 	jsr	vtui_clrscr
 	rts
+;************************************************
+; Saved for later
+;************************************************
+	pha			; Save character on stack temporarily
+
+	lda	rem_space+1	; Check that there is enough available space
+	bne	:+
+	lda	rem_space
+	cmp	#XV_DESKTOP_STRUCT_SIZE
+	bcc	:+
+	pla
+	lda	#XV_NOMEM
+	sec
+	rts
+:	SAVE_PTR X16_PTR_0
+	lda	#<START_OF_LINKED_LIST
+	sta	init_obj_addr	; Use ZP pointer to point to initial element
+	sta	last_obj_addr
+	sta	X16_PTR_0
+	lda	#>START_OF_LINKED_LIST
+	sta	init_obj_addr+1
+	sta	last_obj_addr+1
+	sta	X16_PTR_0+1
+	lda	X16_RAMBank_Reg
+	sta	init_obj_bank
+	sta	last_obj_bank
+	pla			; Restore character from stack
+	phy			; Save Y as it is used to index into structure
+
+	STA_PTR X16_PTR_0, XV_DESKTOP_CHAR
+	txa
+	STA_PTR X16_PTR_0, XV_DESKTOP_COL
+	lda	X16_Reg_R0L	; Load Screenmode
+	clc
+	jsr	X16_Kernal_screen_mode
+	sec
+	jsr	X16_Kernal_screen_mode
+	tya
+	STA_PTR X16_PTR_0, XV_DESKTOP_HEIGHT
+	txa
+	STA_PTR X16_PTR_0, XV_DESKTOP_WIDTH
+
+	lda	X16_Reg_R0H	; Load character set
+	jsr	X16_Kernal_screen_set_charset
+	lda	X16_Reg_R1L	; Load output mode
+	and	#$0F		; Ensure only low nibble is set
+	ora	Vera_Reg_DCVideo
+	sta	Vera_Reg_DCVideo
+
+	lda	#XV_DESKTOP_STRUCT_SIZE
+	sta	(X16_PTR_0)
+	lda	#0
+;	STA_PTR	X16_PTR_0, XV_DESKTOP_NEXTBANK
+;	STA_PTR X16_PTR_0, XV_DESKTOP_NEXT+0
+;	STA_PTR X16_PTR_0, XV_DESKTOP_NEXT+1
+
+	SUB	rem_space, XV_DESKTOP_STRUCT_SIZE
+
+	lda	#1
+	jsr	vtui_setstride
+	clc
+	jsr	vtui_setdecr
+	LDA_PTR X16_PTR_0, XV_DESKTOP_COL
+	tax
+	LDA_PTR X16_PTR_0, XV_DESKTOP_CHAR
+	jsr	vtui_clrscr
+	pha
+	RESTORE_PTR X16_PTR_0
+	pla
+	ply
+	rts
+;*********************************************
 .endproc
 
 ;*****************************************************************************
@@ -88,12 +196,12 @@ OP_RTS=$60	; Opcode for RTS
 ; Preserves X register
 ;*****************************************************************************
 .proc	xv_setisr: near
-	nop
+	GATE_THIS_FUNCTION
 
 	lda	#OP_NOP		; NOP
-	sta	xv_clearisr	; Ungate xv_clearisr
+	sta	xv_clearisr+3	; Ungate xv_clearisr
 	lda	#OP_RTS		; RTS
-	sta	xv_setisr	; Gate xv_setisr
+	sta	xv_setisr+3	; Gate xv_setisr
 
 	; Save ZP ptr to stack
 	SAVE_PTR X16_PTR_0
@@ -137,12 +245,12 @@ OP_RTS=$60	; Opcode for RTS
 ; Preserves X register
 ;*****************************************************************************
 .proc	xv_clearisr: near
-	rts	; Gate
+	GATE_THIS_FUNCTION
 
 	lda	#OP_NOP		; NOP
-	sta	xv_setisr	; Ungate xv_setisr
+	sta	xv_setisr+3	; Ungate xv_setisr
 	lda	#OP_RTS		; RTS
-	sta	xv_clearisr	; Gate xv_clearisr
+	sta	xv_clearisr+3	; Gate xv_clearisr
 
 	; Save ZP ptr to stack
 	SAVE_PTR X16_PTR_0
@@ -175,12 +283,16 @@ OP_RTS=$60	; Opcode for RTS
 ; Returns: current ROM version in A
 ;*****************************************************************************
 .proc	getromver: near
-	phy
+	lda	X16_ROMBank_Reg	; If we are already in ROM Bank 0
+	bne	:+
+	lda	$FF80		; Read ROM version and return
+	rts
+:	phy			; Else preserve Y and switch ROM bank
 	ldy	X16_ROMBank_Reg
 	stz	X16_ROMBank_Reg
 	lda	$FF80
 	sty	X16_ROMBank_Reg
-	ply
+	ply			; Restore Y
 	pha	; Push and Pull A to ensure N flag is correct
 	pla
 	rts
@@ -197,7 +309,7 @@ OP_RTS=$60	; Opcode for RTS
 ; Returns: Carry set on error, A = error code
 ;*****************************************************************************
 .proc	xv_initialize: near
-	sta	lowram_addr	; Write low byte of lowram address to mem
+	sta	lowram_addr	; Save low byte of lowram address to mem
 	; Ensure that we are are on a supported ROM
 	jsr	getromver
 	bmi	@isprerelease
@@ -225,6 +337,8 @@ OP_RTS=$60	; Opcode for RTS
 	rts
 @continue:
 	phy	; Preserve Y
+	lda	lowram_addr	; Preserve low byte of lowram address on stack
+	pha
 	; Save ZP ptr
 	SAVE_PTR X16_PTR_0
 
@@ -250,7 +364,8 @@ OP_RTS=$60	; Opcode for RTS
 	sta	rem_space+1
 
 	; Write low byte of lowram address to ZP ptr
-	lda	lowram_addr
+	pla
+	sta	lowram_addr
 	sta	X16_PTR_0
 	; Save high byte of lowram address and write it to ZP ptr
 	stx	lowram_addr+1
@@ -314,9 +429,25 @@ OP_RTS=$60	; Opcode for RTS
 
 	jsr	vtui_initialize
 
+	; Ungate library functions
+	jsr	ungate
+
 	ply	; Restore Y
 	pla	; Get err/warn code from stack
 	clc	; Clear carry to to show initialization successfull
+	rts
+.endproc
+
+.proc	ungate: near
+	lda	#OP_BRA
+	sta	xv_clearisr
+	sta	xv_setisr
+	sta	xv_desktop
+	lda	#2
+	sta	xv_setisr+1
+	sta	xv_desktop+1
+	lda	#3
+	sta	xv_clearisr+1
 	rts
 .endproc
 

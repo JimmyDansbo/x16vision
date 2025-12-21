@@ -33,4 +33,30 @@ macros_inc=1
 	.byte	$DB
 .endmacro
 
+.macro GATE_THIS_FUNCTION
+	lda	#XV_UNINIT
+	sec
+	rts
+.endmacro
+
+.macro STA_PTR ptr, offset
+	ldy	#offset
+	sta	(ptr),y
+.endmacro
+
+.macro LDA_PTR ptr, offset
+	ldy	#offset
+	lda	(ptr),y
+.endmacro
+
+.macro SUB val, imm
+	sec
+	lda	val
+	sbc	#imm
+	sta	val
+	lda	val+1
+	sbc	#0
+	sta	val+1
+.endmacro
+
 .endif
