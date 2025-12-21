@@ -38,6 +38,8 @@ sta_bank:
 	jmp	$0000
 stay_bank:
 	jmp	$0000
+check_bank_remspace:
+	jmp	$0000
 
 .segment "XVKITBSS"
 
@@ -75,6 +77,34 @@ OP_BRA=$80	; Opcode for BRA
 
 	RESTORE_PTR X16_PTR_0
 @end:	rts
+.endproc
+
+;*****************************************************************************
+; Check that a certain amount of memory is available either in XV bank or in
+; an allocated bank
+;=============================================================================
+; Input:	X16_Reg_X0L = Bytes of memory needed
+; (optional)	X16_Reg_X0H = RAM Bank number to check for available space
+;                             skipped if value of register = 0
+;-----------------------------------------------------------------------------
+; Returns:	Carry clear on success, else Carry set with errorcode in A
+;*****************************************************************************
+.proc	check_remaining_space: near
+	lda	rem_space+1
+	bne	@good
+	lda	rem_space
+	cmp	X16_Reg_X0L
+	bcc	@good
+	; There is not enough remaining space in XV bank
+	lda	X16_Reg_X0H	; Check that a RAM bank has been specified
+	beq	@nobank
+	jmp	check_bank_remspace
+@nobank:
+	lda	#XV_NOMEM
+	sec
+	rts
+@good:	clc
+	rts
 .endproc
 
 ;*****************************************************************************
@@ -120,14 +150,11 @@ OP_BRA=$80	; Opcode for BRA
 ;************************************************
 	pha			; Save character on stack temporarily
 
-	lda	rem_space+1	; Check that there is enough available space
-	bne	:+
-	lda	rem_space
-	cmp	#XV_DESKTOP_STRUCT_SIZE
+	lda	#XV_DESKTOP_STRUCT_SIZE
+	sta	X16_Reg_X0L
+	stz	X16_Reg_X0H
+	jsr	check_remaining_space
 	bcc	:+
-	pla
-	lda	#XV_NOMEM
-	sec
 	rts
 :	SAVE_PTR X16_PTR_0
 	lda	#<START_OF_LINKED_LIST
@@ -427,6 +454,14 @@ OP_BRA=$80	; Opcode for BRA
 	adc	lowram_addr+1
 	sta	stay_bank+2
 
+	lda	#(_check_bank_remspace-_isr)
+	clc
+	adc	lowram_addr
+	sta	check_bank_remspace+1
+	lda	#0
+	adc	lowram_addr+1
+	sta	check_bank_remspace+2
+
 	jsr	vtui_initialize
 
 	; Ungate library functions
@@ -597,6 +632,40 @@ _stay_bank:
 	sta	(X16_PTR_0),y
 	pla			; Restore RAM bank
 	sta	X16_RAMBank_Reg
+	rts
+
+;*****************************************************************************
+; Check that a certain amount of memory is available in an allocated bank
+; A bank is allocated by ensuring that the two first bytes in the bank states
+; how much memory is free in the bank. A freshly allocated RAM bank would 
+; contain $FE $1F in address $A000 and $A001 respectively = $1FFE bytes free
+;=============================================================================
+; Input:	X16_Reg_X0L = Bytes of memory needed
+;		X16_Reg_X0H = RAM Bank to check for available space
+;-----------------------------------------------------------------------------
+; Returns:	Carry clear on success, else Carry set with errorcode in A
+; Preserves:	X, Y & X16_Reg_X0
+;*****************************************************************************
+_check_bank_remspace:
+	lda	X16_RAMBank_Reg	; Save current RAM Bank
+	pha
+	lda	X16_Reg_X0H	; Load new RAM bank
+	sta	X16_RAMBank_Reg
+	lda	$A001
+	bne	@bankgood
+	lda	$A000
+	cmp	X16_Reg_X0L
+	bcc	@bankgood
+	; There is not enough remaining space in the bank
+	pla			; Restore RAM bank
+	sta	X16_RAMBank_Reg
+	lda	#XV_NOMEM
+	sec
+	rts
+@bankgood:
+	pla			; Restore RAM Bank
+	sta	X16_RAMBank_Reg
+	clc
 	rts
 
 _end_xvkit_lowram:
