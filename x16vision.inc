@@ -13,7 +13,7 @@ xv_bank_offset	= 11	; Offset from the lowram address where the RAM bank is store
 ; Error codes
 XV_NOERR	= $00
 XV_UNINIT	= $01	; Library has not yet been initialized
-XV_DONE_ALREADY	= $02	; Function has already been run.
+XV_DONE_ALREADY	= $02	; Function has already been run. (must be 2 for gate and ungate of isr functions to work)
 XV_WRONGROM	= $03	; Unsupported ROM version
 XV_PRERELROM	= $04	; Warning about pre-release ROM version
 XV_NOMEM	= $05	; Not enough available memory
