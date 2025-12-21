@@ -71,13 +71,49 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 ;*****************************************************************************
 ;
 ;=============================================================================
-; Inputs:	placement = top or bottom + text alignment right, left, center
+; Inputs:	placement = top or bottom
+;		text alignment right, left, center
 ;		color
 ;		highlight color
-;		max text length
+;		string length
+;		pointer to string
+;		bank of string
 ;*****************************************************************************
 .proc	_xv_statusbar: near
 	GATE_THIS_FUNCTION
+
+	rts
+.endproc
+
+;*****************************************************************************
+; Print a string. If pointer to string is $A000 or higher, RAM bank must be
+; specified.
+; Function expects stride to be set to 2 so no color information needed
+;=============================================================================
+; Inputs:	X16_PTR_0 = pointer to string
+;		Y length of string
+;		X bank, if in banked memory
+; Uses:		A
+;*****************************************************************************
+.proc	printstr: near
+	lda	X16_Reg_X0L
+	pha
+	sty	X16_Reg_X0L
+	ldy	#0
+@loop:	cpy	X16_Reg_X0L
+	beq	@end
+	lda	X16_PTR_0+1
+	cmp	#$A0
+	bcs	@banked
+	lda	(X16_PTR_0),y
+	bra	:+
+@banked:
+	jsr	lda_bank
+:	sta	Vera_Reg_Data0
+	iny
+	bra	@loop
+end:	pla
+	sta	X16_Reg_X0L
 	rts
 .endproc
 
@@ -537,17 +573,22 @@ _end_isr:
 ;=============================================================================
 ; Arguments: X16_PTR_0, ZP pointer to the memory address that should be read
 ;            .X holds the RAM bank to read from
+;	     .Y holds offset from ZP pointer
 ;-----------------------------------------------------------------------------
 ; Preserves: .X and .Y and the RAM bank before call
 ; Returns: .A contains the value read from memory
 ;*****************************************************************************
 _lda_bank:
-	phy			; Preserve .Y
+	phx			; Preserve bank
+	phy			; Preserve offset
 	ldy	X16_RAMBank_Reg	; Save current RAM bank
 	stx	X16_RAMBank_Reg	; Set new RAM bank
-	lda	(X16_PTR_0)	; Load value from address pointed to by ZP pointer
-	sty	X16_RAMBank_Reg	; Restore RAM bank
-	ply			; Restore .Y
+	phy			; Move original RAM bank from Y to X through stack
+	plx
+	ply			; Pull offset from stack
+	lda	(X16_PTR_0),y	; Load value from address pointed to by ZP pointer
+	stx	X16_RAMBank_Reg	; Restore original RAM bank
+	plx			; Restore RAM bank from caller
 	rts
 
 ;*****************************************************************************
