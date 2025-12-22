@@ -32,7 +32,13 @@ vtui_getdecr	= VTUI_LIB+62
 ; USES:			.A, .X & ,Y
 ; RETURNS:		.C = 1 in case of error.
 ; *****************************************************************************
-.macro VTUI_SCREENSET
+.macro VTUI_SCREENSET mode
+	.if (.match (.left (1, {mode}), #))
+		; immediate mode
+		lda	#mode
+	.else
+		lda	mode
+	.endif
 	jsr	vtui_screenset
 .endmacro
 
@@ -42,7 +48,13 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.C = Bank number, 0 or 1
 ; USES:		.A
 ; *****************************************************************************
-.macro VTUI_SETBANK
+.macro VTUI_SETBANK bank
+	.if (.match (.left (1, {bank}), #))
+		lda	#bank
+	.else
+		lda	bank
+	.endif
+	lsr
 	jsr	vtui_setbank
 .endmacro
 
@@ -62,7 +74,12 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUT:		.A = Stride value
 ; USES:			r0l
 ; *****************************************************************************
-.macro VTUI_SETSTRIDE
+.macro VTUI_SETSTRIDE stide
+	.if (.match (.left (1, {stride}), #))
+		lda	#stride
+	.else
+		lda	stride
+	.endif
 	jsr	vtui_setstride
 .endmacro
 
@@ -81,7 +98,13 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUT:		.C (1 = decrement, 0 = increment)
 ; USES:			.A
 ; *****************************************************************************
-.macro VTUI_SETDECR
+.macro VTUI_SETDECR decr
+	.if (.match (.left (1, {decr}), #))
+		lda	#decr
+	.else
+		lda	decr
+	.endif
+	lsr
 	jsr	vtui_setdecr
 .endmacro
 
@@ -103,7 +126,19 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X = bg-/fg-color
 ; USES:		.A
 ; *****************************************************************************
-.macro VTUI_PLOTCHAR
+.macro VTUI_PLOTCHAR char, col
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_plotchar
 .endmacro
 
@@ -126,7 +161,24 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.Y	= Length of the line
 ;		.X	= bg- & fg-color
 ; *****************************************************************************
-.macro VTUI_HLINE
+.macro VTUI_HLINE char, len, col
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
+	.if (.match (.left (1, {len}), #))
+		ldy	#len
+	.else
+		ldy	len
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_hline
 .endmacro
 
@@ -138,7 +190,24 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X	= bg- & fg-color
 ; USES:		r1h & r2h
 ; *****************************************************************************
-.macro VTUI_VLINE
+.macro VTUI_VLINE char, len, col
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
+	.if (.match (.left (1, {len}), #))
+		ldy	#len
+	.else
+		ldy	len
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_vline
 .endmacro
 
@@ -148,7 +217,17 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.A = x coordinate
 ;		.Y = y coordinate
 ; *****************************************************************************
-.macro VTUI_GOTOXY
+.macro VTUI_GOTOXY x, y
+	.if (.match (.left (1, {x}), #))
+		lda	#x
+	.else
+		lda	x
+	.endif
+	.if (.match (.left (1, {y}), #))
+		ldy	#y
+	.else
+		ldy	y
+	.endif
 	jsr	vtui_gotoxy
 .endmacro
 
@@ -158,7 +237,12 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.A = character to convert
 ; OUTPUS:	.A = converted character or $56 if invalid input
 ; *****************************************************************************
-.macro VTUI_PET2SCR
+.macro VTUI_PET2SCR char
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
 	jsr	vtui_pet2scr
 .endmacro
 
@@ -168,7 +252,12 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.A = character to convert
 ; OUTPUS:	.A = converted character or $76 if invalid input
 ; *****************************************************************************
-.macro VTUI_SCR2PET
+.macro VTUI_SCR2PET char
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
 	jsr	vtui_scr2pet
 .endmacro
 
@@ -181,7 +270,30 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X  = bg-/fg color (only used if stride=0,decr=0&bank=0)
 ; USES:		.A, .Y & r1
 ; *****************************************************************************
-.macro VTUI_PRINTSTR
+.macro VTUI_PRINTSTR ptr, len, conv, col
+	.ifnblank ptr
+		lda	#<ptr
+		sta	$02
+		lda	#>ptr
+		sta	$03
+	.endif
+	.if (.match (.left (1, {len}), #))
+		ldy	#len
+	.else
+		ldy	len
+	.endif
+	.if (.match (.left (1, {conv}), #))
+		lda	#conv
+	.else
+		lda	conv
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_printstr
 .endmacro
 
@@ -193,7 +305,31 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r2l	= Height of box
 ;		.X	= bg- & fg-color
 ; *****************************************************************************
-.macro VTUI_FILLBOX
+.macro VTUI_FILLBOX char, width, height, col
+	.if (.match (.left (1, {width}), #))
+		lda	#width
+	.else
+		lda	width
+	.endif
+	sta	$04
+	.if (.match (.left (1, {height}), #))
+		lda	#height
+	.else
+		lda	height
+	.endif
+	sta	$06
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_fillbox
 .endmacro
 
@@ -204,7 +340,17 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X	= bg- & fg-color
 ; USES:		.Y, r1l & r2l
 ; *****************************************************************************
-.macro VTUI_CLRSCR
+.macro VTUI_CLRSCR char, col
+	.if (.match (.left (1, {char}), #))
+		lda	#char
+	.else
+		lda	char
+	.endif
+	.if (.match (.left (1, {col}), #))
+		ldx	#col
+	.else
+		ldx	col
+	.endif
 	jsr	vtui_clrscr
 .endmacro
 
@@ -217,7 +363,31 @@ vtui_getdecr	= VTUI_LIB+62
 ;		.X	= bg-/fg-color
 ; USES		.Y, r0, r1h & r2h
 ; *****************************************************************************
-.macro VTUI_BORDER
+.macro VTUI_BORDER border, width, height, col
+	.if (.match (.left (1, {width}), #))
+		lda	#width
+	.else
+		lda	width
+	.endif
+	sta	$04
+	.if (.match (.left (1, {height}), #))
+		lda	#height
+	.else
+		lda	height
+	.endif
+	sta	$06
+	.if (.match (.left (1, {border}), #))
+		lda	#border
+	.else
+		lda	border
+	.endif
+	.ifnblank col
+		.if (.match (.left (1, {col}), #))
+			ldx	#col
+		.else
+			ldx	col
+		.endif
+	.endif
 	jsr	vtui_border
 .endmacro
 
@@ -232,7 +402,38 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r2l	= height
 ; USES:		r1h
 ; *****************************************************************************
-.macro VTUI_SAVERECT
+.macro VTUI_SAVERECT destram, destaddr, width, height, vbank
+	.if (.match (.left (1, {width}), #))
+		lda	#width
+	.else
+		lda	width
+	.endif
+	sta	$04
+	.if (.match (.left (1, {height}), #))
+		lda	#height
+	.else
+		lda	height
+	.endif
+	sta	$06
+	.ifnblank destaddr
+		lda	#<destaddr
+		sta	$02
+		lda	#>destaddr
+		sta	$03
+	.endif
+	.ifnblank vbank
+		.if (.match (.left (1, {vbank}), #))
+			lda	#vbank
+		.else
+			lda	vbank
+		.endif
+		lsr
+	.endif
+	.if (.match (.left (1, {destram}), #))
+		lda	#destram
+	.else
+		lda	destram
+	.endif
 	jsr	vtui_saverect
 .endmacro
 
@@ -246,7 +447,38 @@ vtui_getdecr	= VTUI_LIB+62
 ;		r1l	= width
 ;		r2l	= height
 ; *****************************************************************************
-.macro VTUI_RESTRECT
+.macro VTUI_RESTRECT srcram, srcaddr, width, height, vbank
+	.if (.match (.left (1, {width}), #))
+		lda	#width
+	.else
+		lda	width
+	.endif
+	sta	$04
+	.if (.match (.left (1, {height}), #))
+		lda	#height
+	.else
+		lda	height
+	.endif
+	sta	$06
+	.ifnblank destaddr
+		lda	#<srcaddr
+		sta	$02
+		lda	#>srcaddr
+		sta	$03
+	.endif
+	.ifnblank vbank
+		.if (.match (.left (1, {vbank}), #))
+			lda	#vbank
+		.else
+			lda	vbank
+		.endif
+		lsr
+	.endif
+	.if (.match (.left (1, {srcram}), #))
+		lda	#srcram
+	.else
+		lda	srcram
+	.endif
 	jsr	vtui_restrect
 .endmacro
 
@@ -259,7 +491,23 @@ vtui_getdecr	= VTUI_LIB+62
 ; OUPUTS:	.Y = actual length of input
 ; USES:		.A & r1
 ; *****************************************************************************
-.macro VTUI_INPUTSTR
+.macro VTUI_INPUTSTR len, col, ptr
+	.ifnblank ptr
+		lda	#<ptr
+		sta	$02
+		lda	#>ptr
+		sta	$03
+	.endif
+	.if (.match (.left (1, {col}), #))
+		ldx	#col
+	.else
+		ldx	#col
+	.endif
+	.if (.match (.left (1, {len}), #))
+		ldy	#len
+	.else
+		ldy	len
+	.endif
 	jsr	vtui_inputstr
 .endmacro
 
