@@ -81,7 +81,25 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 ;*****************************************************************************
 .proc	_xv_statusbar: near
 	GATE_THIS_FUNCTION
+	STACK_SAVE_PTR X16_PTR_0
 
+	lda	#2
+	jsr	vtui_setstride
+	lda	#0
+	ldy	#0
+	jsr	vtui_gotoxy
+
+;	lda	#$A0
+;	sta	X16_PTR_0+1
+;	stz	X16_PTR_0
+	ldy	#12
+	ldx	#11
+	jsr	printstr
+
+	lda	#1
+	jsr	vtui_setstride
+
+	STACK_RESTORE_PTR X16_PTR_0
 	rts
 .endproc
 
@@ -90,7 +108,7 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 ; specified.
 ; Function expects stride to be set to 2 so no color information needed
 ;=============================================================================
-; Inputs:	X16_PTR_0 = pointer to string
+; Inputs:	X16_PTR_0 ZP pointer to string
 ;		Y length of string
 ;		X bank, if in banked memory
 ; Uses:		A
@@ -112,7 +130,7 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 :	sta	Vera_Reg_Data0
 	iny
 	bra	@loop
-end:	pla
+@end:	pla
 	sta	X16_Reg_X0L
 	rts
 .endproc
@@ -571,7 +589,7 @@ _end_isr:
 ; Load a byte from banked RAM pointed to by ZP pointer X16_PTR_0 in bank
 ; specified by the value in .X
 ;=============================================================================
-; Arguments: X16_PTR_0, ZP pointer to the memory address that should be read
+; Arguments: X16_PTR_0 pointer to the memory address that should be read
 ;            .X holds the RAM bank to read from
 ;	     .Y holds offset from ZP pointer
 ;-----------------------------------------------------------------------------
@@ -586,7 +604,7 @@ _lda_bank:
 	phy			; Move original RAM bank from Y to X through stack
 	plx
 	ply			; Pull offset from stack
-	lda	(X16_PTR_0),y	; Load value from address pointed to by ZP pointer
+@ptr:	lda	(X16_PTR_0),y	; Load value from address pointed to by ZP pointer
 	stx	X16_RAMBank_Reg	; Restore original RAM bank
 	plx			; Restore RAM bank from caller
 	rts
