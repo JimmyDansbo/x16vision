@@ -217,16 +217,16 @@ vtui_getdecr	= VTUI_LIB+62
 ; INPUTS:	.A = x coordinate
 ;		.Y = y coordinate
 ; *****************************************************************************
-.macro VTUI_GOTOXY x, y
-	.if (.match (.left (1, {x}), #))
-		lda	#x
+.macro VTUI_GOTOXY xcord, ycord
+	.if (.match (.left (1, {xcord}), #))
+		lda	#xcord
 	.else
-		lda	x
+		lda	xcord
 	.endif
-	.if (.match (.left (1, {y}), #))
-		ldy	#y
+	.if (.match (.left (1, {ycord}), #))
+		ldy	#ycord
 	.else
-		ldy	y
+		ldy	ycord
 	.endif
 	jsr	vtui_gotoxy
 .endmacro
