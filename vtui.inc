@@ -1,20 +1,20 @@
 .segment "VTUI"
 ; ******************************* Functions ***********************************
-VTUI_LIB=VTUI+2
+VTUI_LIB=*				; VTUI+2
 
 vtui_initialize	= VTUI_LIB+0
 vtui_screenset	= VTUI_LIB+2
 vtui_setbank	= VTUI_LIB+5
-vtui_setstride	= VTUI_LIB+8
-vtui_setdecr	= VTUI_LIB+11
-vtui_clrscr	= VTUI_LIB+14
-vtui_gotoxy	= VTUI_LIB+17
+vtui_setstride	= _vtui_setstride	; VTUI_LIB+8
+vtui_setdecr	= _vtui_setdecr		; VTUI_LIB+11
+vtui_clrscr	= _vtui_clrscr		; VTUI_LIB+14
+vtui_gotoxy	= _vtui_gotoxy		; VTUI_LIB+17
 vtui_plotchar	= VTUI_LIB+20
 vtui_scanchar	= VTUI_LIB+23
 vtui_hline	= VTUI_LIB+26
 vtui_vline	= VTUI_LIB+29
 vtui_printstr	= VTUI_LIB+32
-vtui_fillbox	= VTUI_LIB+35
+vtui_fillbox	= _vtui_fillbox		; VTUI_LIB+35
 vtui_pet2scr	= VTUI_LIB+38
 vtui_scr2pet	= VTUI_LIB+41
 vtui_border	= VTUI_LIB+44
@@ -22,25 +22,79 @@ vtui_saverect	= VTUI_LIB+47
 vtui_restrect	= VTUI_LIB+50
 vtui_inputstr	= VTUI_LIB+53
 vtui_getbank	= VTUI_LIB+56
-vtui_getstride	= VTUI_LIB+59
-vtui_getdecr	= VTUI_LIB+62
+vtui_getstride	= _vtui_get_stride	; VTUI_LIB+59
+vtui_getdecr	= _vtui_get_stride	; VTUI_LIB+62
 
-; *****************************************************************************
-; Use KERNAL API to set screen to 80x60 or 40x30 or swap between them.
-; *****************************************************************************
-; INPUT:		.A = Screenmode ($00, $02 or $FF)
-; USES:			.A, .X & ,Y
-; RETURNS:		.C = 1 in case of error.
-; *****************************************************************************
-.macro VTUI_SCREENSET mode
-	.if (.match (.left (1, {mode}), #))
-		; immediate mode
-		lda	#mode
-	.else
-		lda	mode
-	.endif
-	jsr	vtui_screenset
-.endmacro
+_vtui_get_stride:
+	lda	Vera_Reg_AddrH
+	lsr
+	lsr
+	lsr
+	lsr
+	rts
+
+_vtui_gotoxy:
+	asl
+	sta	Vera_Reg_AddrL
+	tya
+	adc	#$B0
+	sta	Vera_Reg_AddrM
+	rts
+
+_vtui_setstride:
+@tmp = X16_Reg_X0L
+	phy			; Preserve Y
+	asl			; Stride is stored in upper nibble
+	asl
+	asl
+	asl
+	ldy	@tmp		; Preserve temporary ZP register
+	sta	@tmp		; Write stride value to memory for later comparison
+	lda	Vera_Reg_AddrH	; Zero out upper nibble of VERA addr H
+	and	#$0F
+	ora	@tmp		; Write stride value to VERA addr H
+	sta	Vera_Reg_AddrH
+	sty	@tmp		; Restore ZP register
+	ply			; Restore Y
+	rts
+
+_vtui_setdecr:
+	lda	Vera_Reg_AddrH
+	ora	#%00001000
+	bcs	@end
+	and	#%11110111
+@end:	sta	Vera_Reg_AddrH
+	rts
+
+_vtui_clrscr:
+@width = X16_Reg_R1L
+@height = X16_Reg_R2L
+	ldy	#$B0
+	sty	Vera_Reg_AddrM
+	stz	Vera_Reg_AddrL
+	ldy	#80
+	sty	@width
+	ldy	#60
+	sty	@height
+	; Fall through to fillbox
+
+_vtui_fillbox:
+@width = X16_Reg_R1L
+@height = X16_Reg_R2L
+@xcoord = X16_Reg_R0L
+	ldy	Vera_Reg_AddrL
+	sty	@xcoord
+@vloop:	ldy	@xcoord
+	sty	Vera_Reg_AddrL
+	ldy	@width
+@hloop:	sta	Vera_Reg_Data0
+	stx	Vera_Reg_Data0
+	dey
+	bne	@hloop
+	inc	Vera_Reg_AddrM
+	dec	@height
+	bne	@vloop
+	rts
 
 ; *****************************************************************************
 ; Set VERA bank (High memory) without touching anything else
@@ -511,6 +565,6 @@ vtui_getdecr	= VTUI_LIB+62
 	jsr	vtui_inputstr
 .endmacro
 
-VTUI:	.incbin	"VTUI1.2.BIN"
+;VTUI:	.incbin	"VTUI1.2.BIN"
 
 VTUI_LIB_END:
