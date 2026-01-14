@@ -1,19 +1,32 @@
 .include "x16.inc"
 .include "macros.inc"
-.include "vtui.inc"
 .include "x16vision.inc"
 
 .import __XVKIT_LOWRAM_SIZE__, __XVKITBSS_SIZE__, __XVKITBSS_LOAD__
+
+; Imports from memman.s
+.import check_rem_space
+.export rem_space
+
+; Imports from vtui.s
+.import vtui_initialize, vtui_screenset, vtui_setbank, vtui_setstride
+.import vtui_setdecr, vtui_clrscr, vtui_gotoxy, vtui_plotchar
+.import vtui_scanchar, vtui_hline, vtui_vline, vtui_printstr
+.import vtui_fillbox, vtui_pet2scr, vtui_scr2pet, vtui_border
+.import vtui_saverect, vtui_restrect, vtui_inputstr, vtui_getbank
+.import vtui_getstride, vtui_getdecr
 
 X16VISION_VERSION	= $0001
 MINIMUM_ROMVERSION	= 48
 
 .segment "JUMPTABLE"
-	jmp	_xv_initialize	; $A000
-	jmp	_xv_setisr	; $A003
-	jmp	_xv_clearisr	; $A006
-	jmp	_xv_desktop	; $A009
-	jmp	_xv_statusbar	; $A00C
+; Variable holding amount of free space in the bank
+rem_space:	.res 2
+	jmp	_xv_initialize	; $A002
+	jmp	_xv_setisr	; $A005
+	jmp	_xv_clearisr	; $A008
+	jmp	_xv_desktop	; $A00B
+	jmp	_xv_statusbar	; $A00E
 
 ; Internal jump table into lowram functions
 ; The bank-load and store functions use X16_PTR_0 for the address and X for bank
@@ -26,9 +39,6 @@ ldyxa_bank:		; Return lowbyte in Y, midbyte in X , highbyte in A
 sta_bank:		; Store value in A
 	jmp	$0000
 stay_bank:		; Store A to lowbyte, Y to highbyte
-	jmp	$0000
-
-check_bank_remspace:
 	jmp	$0000
 
 .segment "XVKITBSS"
@@ -45,11 +55,10 @@ last_obj_bank:	.res 1
 preserve_ptr:	.res 4
 ; Space reserved for the desktop information
 desktop:	.res XV_DESKTOP_STRUCT_SIZE
-; Variable holding amount of free space in the bank
-rem_space:	.res 2
 
-START_OF_LINKED_LIST = *
+START_OF_LINKED_LIST:
 .segment "XVKITLIB"
+
 OP_BRA=$80	; Opcode for BRA
 OP_LDA_IMM=$A9	; Opcode for LDA #
 
@@ -136,34 +145,6 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 .endproc
 
 ;*****************************************************************************
-; Check that a certain amount of memory is available either in XV bank or in
-; an allocated bank
-;=============================================================================
-; Input:	X16_Reg_X0L = Bytes of memory needed
-; (optional)	X16_Reg_X0H = RAM Bank number to check for available space
-;                             skipped if value of register = 0
-;-----------------------------------------------------------------------------
-; Returns:	Carry clear on success, else Carry set with errorcode in A
-;*****************************************************************************
-.proc	check_remaining_space: near
-	lda	rem_space+1
-	bne	@good
-	lda	rem_space
-	cmp	X16_Reg_X0L
-	bcc	@good
-	; There is not enough remaining space in XV bank
-	lda	X16_Reg_X0H	; Check that a RAM bank has been specified
-	beq	@nobank
-	jmp	check_bank_remspace
-@nobank:
-	lda	#XV_NOMEM
-	sec
-	rts
-@good:	clc
-	rts
-.endproc
-
-;*****************************************************************************
 ; Create, draw and save information about the desktop element which must be
 ; the first element created by the library
 ;=============================================================================
@@ -178,10 +159,10 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	sta	desktop+XV_DESKTOP_CHAR
 	stx	desktop+XV_DESKTOP_COL
 	
-	lda	X16_Reg_R0L	; Load Screen Mode
+	lda	X16_Reg_R0L	; Set Screen Mode
 	clc
 	jsr	X16_Kernal_screen_mode
-	sec
+	sec			; Get height and width of current screen mode
 	jsr	X16_Kernal_screen_mode
 	sty	desktop+XV_DESKTOP_HEIGHT
 	stx	desktop+XV_DESKTOP_WIDTH
@@ -209,7 +190,7 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	lda	#XV_DESKTOP_STRUCT_SIZE
 	sta	X16_Reg_X0L
 	stz	X16_Reg_X0H
-	jsr	check_remaining_space
+	jsr	check_rem_space
 	bcc	:+
 	rts
 :	SAVE_PTR X16_PTR_0
@@ -515,15 +496,7 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	adc	lowram_addr+1
 	sta	stay_bank+2
 
-	lda	#(_check_bank_remspace-_isr)
-	clc
-	adc	lowram_addr
-	sta	check_bank_remspace+1
-	lda	#0
-	adc	lowram_addr+1
-	sta	check_bank_remspace+2
-
-	jsr	vtui_initialize
+;	jsr	vtui_initialize
 
 	; Ungate library functions
 	jsr	ungate
@@ -707,40 +680,6 @@ _stay_bank:
 	pla			; Restore RAM bank to original
 	sta	X16_RAMBank_Reg
 	pla			; Restore A register
-	rts
-
-;*****************************************************************************
-; Check that a certain amount of memory is available in an allocated bank
-; A bank is allocated by ensuring that the two first bytes in the bank states
-; how much memory is free in the bank. A freshly allocated RAM bank would 
-; contain $FE $1F in address $A000 and $A001 respectively = $1FFE bytes free
-;=============================================================================
-; Input:	X16_Reg_X0L = Bytes of memory needed
-;		X16_Reg_X0H = RAM Bank to check for available space
-;-----------------------------------------------------------------------------
-; Returns:	Carry clear on success, else Carry set with errorcode in A
-; Preserves:	X, Y & X16_Reg_X0
-;*****************************************************************************
-_check_bank_remspace:
-	lda	X16_RAMBank_Reg	; Save current RAM Bank
-	pha
-	lda	X16_Reg_X0H	; Load new RAM bank
-	sta	X16_RAMBank_Reg
-	lda	$A001
-	bne	@bankgood
-	lda	$A000
-	cmp	X16_Reg_X0L
-	bcc	@bankgood
-	; There is not enough remaining space in the bank
-	pla			; Restore RAM bank
-	sta	X16_RAMBank_Reg
-	lda	#XV_NOMEM
-	sec
-	rts
-@bankgood:
-	pla			; Restore RAM Bank
-	sta	X16_RAMBank_Reg
-	clc
 	rts
 
 _end_xvkit_lowram:

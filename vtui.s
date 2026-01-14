@@ -1,4 +1,13 @@
 .segment "VTUI"
+.include "x16.inc"
+
+.export vtui_initialize, vtui_screenset, vtui_setbank, vtui_setstride
+.export vtui_setdecr, vtui_clrscr, vtui_gotoxy, vtui_plotchar
+.export vtui_scanchar, vtui_hline, vtui_vline, vtui_printstr
+.export vtui_fillbox, vtui_pet2scr, vtui_scr2pet, vtui_border
+.export vtui_saverect, vtui_restrect, vtui_inputstr, vtui_getbank
+.export vtui_getstride, vtui_getdecr
+
 ; ******************************* Functions ***********************************
 VTUI_LIB=*				; VTUI+2
 
