@@ -19,3 +19,9 @@ Initially, the library will use the remaining free space in the bank it is loade
 If the library bank gets full, the library must be able to handle using another RAM bank to dynamically allocate memory for metadata. It is assumed that a newly given RAM bank will be fully available to the library.
 
 256 bytes of lowram must be provided to the library for helper functions like Interrupt Service Routine (ISR), banked fetch and store routines etc.
+
+# Memory structures
+
+At the very beginning of an allocated RAM bank ($A000), must be the number of available bytes in that bank, occupying 2 bytes.
+The next 2 bytes must contain the address if the first available byte in that RAM bank. For an empty RAM bank that address would be $A004.
+This is done to enable the x16vision library to use the same bank as it is stored in for allocating memory for objects.
