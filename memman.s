@@ -12,6 +12,7 @@ orig_isr:	.res	2
 scratch:	.res	2
 
 REM_SPACE=$A000
+FREE_ADDR=$A002
 
 _isr_bank=4
 _isr_addr=8
@@ -32,10 +33,65 @@ stay_bank:		; Store A to lowbyte, Y to highbyte			X=bank
 	jmp	$0000
 
 ;*****************************************************************************
+; Allocate the requested number of bytes if they are available
 ;=============================================================================
+; Inputs:	.A = number of bytes
+; 		.X = bank
+; Output:	.A & .Y = low- and high-byte of address of allocated memory
+;		.C = set if memory is available, otherwise clear
 ;-----------------------------------------------------------------------------
+; Preserves:	.X
+; Uses:		LD_ST_BANK_PTR
 ;*****************************************************************************
 .proc allocate_space: near
+	jsr	check_space
+	bcc	@end
+	; Memory is available here. Calculate the new free space and pointer
+	pha			; Save the number of bytes being requested
+	; Set ZP pointer to FREE_ADDR
+	lda	#<FREE_ADDR
+	sta	LD_ST_BANK_PTR
+	lda	#>FREE_ADDR
+	sta	LD_ST_BANK_PTR+1
+	jsr	lday_bank	; Read next available address from bank
+	sta	scratch
+	sty	scratch+1
+
+	pla			; Restore number of bytes being requested
+
+	; Save address on stack as this needs to be returned to caller
+	phy		; high-byte
+	ldy	scratch
+	phy		; low-byte
+
+
+	clc			; Calculate new next available address
+	adc	scratch
+	sta	scratch
+	lda	#0
+	adc	scratch+1
+	sta	scratch+1
+
+	; Calculate new free space after allocation of memory
+	lda	#<X16_ROM_Window
+	sec
+	sbc	scratch
+	pha
+	lda	#>X16_ROM_Window
+	sbc	scratch+1
+	tay
+	stz	LD_ST_BANK_PTR
+	pla
+	jsr	stay_bank
+	lda	#<FREE_ADDR
+	sta	LD_ST_BANK_PTR
+	lda	scratch
+	ldy	scratch+1
+	jsr	stay_bank
+	pla
+	ply
+	sec
+@end:	rts
 .endproc
 
 ;*****************************************************************************
@@ -46,7 +102,8 @@ stay_bank:		; Store A to lowbyte, Y to highbyte			X=bank
 ;		.X = bank
 ; Output:	Carry set if the memory is available, otherwise clear
 ;-----------------------------------------------------------------------------
-; Preserves:	.X
+; Uses:		LD_ST_BANK_PTR
+; Preserves:	.A & .X
 ;*****************************************************************************
 .proc check_space: near
 	pha			; Save the number of bytes being requested
@@ -60,9 +117,11 @@ stay_bank:		; Store A to lowbyte, Y to highbyte			X=bank
 	ldy	scratch+1	; Check high-byte
 	bne	@good
 	; Here, we know that high-byte is 0
+	pha			; Save on stack again
 	sta	scratch+1	; Store bytes requested to scratch and load
 	lda	scratch		; available bytes into A for CMP
 	cmp	scratch+1
+	pla			; Restore bytes requested
 	rts	; Exit function with C set if mem avail otherwise clear
 @good:	sec
 	rts
