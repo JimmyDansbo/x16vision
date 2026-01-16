@@ -2,11 +2,11 @@
 ; To call any of the routines, switch to the bank where code
 ; is loaded, then jsr to the routine
 
-xv_initialize	= $A002 ; Initialize the library
-xv_setisr	= $A005 ; Install interrupt handler
-xv_clearisr	= $A008	; Restore old interrupt handler
-xv_desktop	= $A00B ; Create the desktop, set screen, charset, background pattern and color
-xv_statusbar	= $A00E	; Create a status bar
+xv_initialize	= $A004 ; Initialize the library
+xv_setisr	= $A007 ; Install interrupt handler
+xv_clearisr	= $A00A	; Restore old interrupt handler
+xv_desktop	= $A00D ; Create the desktop, set screen, charset, background pattern and color
+xv_statusbar	= $A010	; Create a status bar
 
 xv_bank_offset	= 11	; Offset from the lowram address where the RAM bank is stored
 
