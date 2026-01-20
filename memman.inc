@@ -6,7 +6,7 @@ memman_inc=1
 LD_ST_BANK_PTR = X16_PTR_0
 
 .ifndef SKIPIMPORT
-	.import init_lowram, set_banked_isr, clear_banked_isr, check_space, allocate_space
+.import mm_init_lowram, mm_set_isr, mm_clear_isr, mm_alloc, mm_remaining
 .endif
 
 .endif

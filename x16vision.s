@@ -207,20 +207,39 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 ; Returns: Carry set on error, A = error code
 ;*****************************************************************************
 .proc	_xv_initialize: near
-	jsr	init_lowram
+	jsr	mm_init_lowram
 
+	; Calculate the remaining free space in the current bank and store
+	; the value in the rem_space variable - this is the amount of
+	; space the user has for creating objects
+	lda	#<(X16_RAM_Window+X16_RAM_WindowSize-START_OF_LINKED_LIST)
+	sta	rem_space
+	lda	#>(X16_RAM_Window+X16_RAM_WindowSize-START_OF_LINKED_LIST)
+	sta	rem_space+1
+
+	lda	#<START_OF_LINKED_LIST
+	sta	free_addr
+	lda	#>START_OF_LINKED_LIST
+	sta	free_addr+1
 	ldx	#$10
-	lda	#25
-	jsr	check_space
+
+	lda	#200
+	jsr	mm_alloc
+	jsr	mm_remaining
+
 	rts
 	lda	#<xv_tick
 	ldx	#>xv_tick
 	ldy	#$10 ; this is the same as in test.asm
 	sty	$30
 	ldy	#$30
-	jsr	set_banked_isr
+	jsr	mm_set_isr
 	rts
-	
+
+
+
+
+
 	sta	lowram_addr	; Save low byte of lowram address to mem
 	; Ensure that we are are on a supported ROM
 	jsr	getromver
@@ -268,13 +287,6 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	bne	@zloop
 	sta	(X16_PTR_0)
 
-	; Calculate the remaining free space in the current bank and store
-	; the value in the rem_space variable - this is the amount of
-	; space the user has for creating objects
-	lda	#<(X16_RAM_Window+X16_RAM_WindowSize-START_OF_LINKED_LIST)
-	sta	rem_space
-	lda	#>(X16_RAM_Window+X16_RAM_WindowSize-START_OF_LINKED_LIST)
-	sta	rem_space+1
 
 	; Write low byte of lowram address to ZP ptr
 	pla
@@ -287,7 +299,7 @@ OP_LDA_IMM=$A9	; Opcode for LDA #
 	lda	X16_RAMBank_Reg
 ;	sta	ISRBANK
 
-	jsr	vtui_initialize
+;	jsr	vtui_initialize
 
 	ply	; Restore Y
 	pla	; Get err/warn code from stack
