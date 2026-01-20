@@ -56,7 +56,7 @@ zpp2:	sta	$42+1
 ;		.C = set if memory is available, otherwise clear
 ;-----------------------------------------------------------------------------
 ; Preserves:	.X
-; Uses:		LD_ST_BANK_PTR
+; Uses:		ZP pointer
 ;*****************************************************************************
 .proc mm_alloc: near
 	; Ensure that requested amount is more than 0 bytes
@@ -64,10 +64,17 @@ zpp2:	sta	$42+1
 	bcs	:+
 	clc		; Return carry clear if requested amount is 0
 	rts
-:	jsr	check_space
+:	; Ensure that requested amount is less than 255 bytes
+	cmp	#$FF
+	bne	:+
+	clc
+	rts
+:	inc	; Allocate an extra byte for header/size information
+	jsr	check_space
 	bcc	end
 	; Memory is available here. Calculate the new free space and pointer
-	pha			; Save the number of bytes being requested
+	dec	; Save only the amount the user has requested
+	pha	; Save the number of bytes being requested
 	; Set ZP pointer to FREE_ADDR
 	lda	#<FREE_ADDR
 zp19:	sta	$42
@@ -75,13 +82,20 @@ zp19:	sta	$42
 zpp3:	sta	$42+1
 	jsr	lday_bank	; Read next available address from bank
 	sta	scratch
+zp23:	sta	$42
 	sty	scratch+1
+zpp5:	sty	$42+1
 
-	pla			; Restore number of bytes being requested
+	pla			; Restore number of bytes being requested (+1)
+	ldy	#0
+	jsr	sta_bank	; Store as header of allocated memory
+
+	inc	; We are still allocating 1 byte more than requested for the header
 	; Save address on stack as this needs to be returned to caller
-	phy	; high-byte
 	ldy	scratch
-	phy	; low-byte
+	phy			; low-byte
+	ldy	scratch+1
+	phy			; high-byte
 
 	clc			; Calculate new next available address
 	adc	scratch
@@ -97,17 +111,23 @@ zpp3:	sta	$42+1
 	lda	#>X16_ROM_Window
 	sbc	scratch+1
 	tay
+	lda	#>REM_SPACE
 zp20:	stz	$42
+zpp6:	sta	$42+1
 	pla
-	jsr	stay_bank
+	jsr	stay_bank	; Store new free space
 	lda	#<FREE_ADDR
 zp21:	sta	$42
 	lda	scratch
 	ldy	scratch+1
-	jsr	stay_bank
-	pla
+	jsr	stay_bank	; Store pointer to next available space
+	; Load start of allocated memory back into .A & .Y, add 1 to skip header
 	ply
-	sec
+	pla
+	inc
+	bne	:+
+	iny
+:	sec
 end:	rts
 .endproc
 
@@ -138,14 +158,12 @@ end:	rts
 ; Preserves:	.X
 ;*****************************************************************************
 .proc mm_set_isr: near
-	pha	; Save low-byte of ISR on stack as .A needs to be used
-	; Store lowram_addr in ZP pointer
-	lda	lowram_addr
-zp03:	sta	$42
-	lda	lowram_addr+1
-zpp1:	sta	$42+1
-	pla	; Restore low-byte of ISR from stack
 	phy	; Preserve high-byte of ISR on stack
+	; Store lowram_addr in ZP pointer
+	ldy	lowram_addr
+zp03:	sty	$42
+	ldy	lowram_addr+1
+zpp1:	sty	$42+1
 	; Store low-byte of address for banked ISR
 	ldy	#_isr_addr
 zp04:	sta	($42),y
@@ -299,6 +317,7 @@ zp_table:
 	.word mm_alloc::zp20+1
 	.word mm_alloc::zp21+1
 	.word check_space::zp22+1
+	.word mm_alloc::zp23+1
 	.word $0000
 
 ;*****************************************************************************
@@ -361,6 +380,8 @@ zp_table:
 	sty	mm_remaining::zpp2+1
 	sty	mm_alloc::zpp3+1
 	sty	check_space::zpp4+1
+	sty	mm_alloc::zpp5+1
+	sty	mm_alloc::zpp6+1
 	rts
 .endproc
 
