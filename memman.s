@@ -14,8 +14,6 @@ scratch:	.res	2
 REM_SPACE=$A000
 FREE_ADDR=$A002
 
-ZP=$42
-
 _isr_bank=4
 _isr_addr=8
 _isr_orig=14
@@ -44,8 +42,8 @@ stay_bank:		; Store A to lowbyte, Y to highbyte			X=bank
 ;*****************************************************************************
 .proc mm_remaining: near
 	lda	#>REM_SPACE	; Set address $A000 in ZP pointer
-zp19:	stz	ZP
-zpp2:	sta	ZP+1
+zp18:	stz	$42
+zpp2:	sta	$42+1
 	jmp	lday_bank	; Read available memory from bank
 .endproc
 
@@ -72,9 +70,9 @@ zpp2:	sta	ZP+1
 	pha			; Save the number of bytes being requested
 	; Set ZP pointer to FREE_ADDR
 	lda	#<FREE_ADDR
-zp20:	sta	ZP
+zp19:	sta	$42
 	lda	#>FREE_ADDR
-zpp3:	sta	ZP+1
+zpp3:	sta	$42+1
 	jsr	lday_bank	; Read next available address from bank
 	sta	scratch
 	sty	scratch+1
@@ -99,11 +97,11 @@ zpp3:	sta	ZP+1
 	lda	#>X16_ROM_Window
 	sbc	scratch+1
 	tay
-zp21:	stz	ZP
+zp20:	stz	$42
 	pla
 	jsr	stay_bank
 	lda	#<FREE_ADDR
-zp22:	sta	ZP
+zp21:	sta	$42
 	lda	scratch
 	ldy	scratch+1
 	jsr	stay_bank
@@ -114,40 +112,7 @@ end:	rts
 .endproc
 
 ;*****************************************************************************
-; Check if requested amount of space is available in the specified bank
-; Maximum request size is 255 bytes
-;=============================================================================
-; Inputs:	.A = number of bytes 
-;		.X = bank
-; Output:	Carry set if the memory is available, otherwise clear
-;-----------------------------------------------------------------------------
-; Uses:		LD_ST_BANK_PTR
-; Preserves:	.A & .X
-;*****************************************************************************
-.proc check_space: near
-	pha			; Save the number of bytes being requested
-	lda	#>REM_SPACE	; Set address $A000 in ZP pointer
-zp23:	stz	ZP
-zpp4:	sta	ZP+1
-	jsr	lday_bank	; Read available memory from bank
-	sta	scratch
-	sty	scratch+1
-	pla			; Restore bytes requested
-	ldy	scratch+1	; Check high-byte
-	bne	good
-	; Here, we know that high-byte is 0
-	pha			; Save on stack again
-	sta	scratch+1	; Store bytes requested to scratch and load
-	lda	scratch		; available bytes into A for CMP
-	cmp	scratch+1
-	pla			; Restore bytes requested
-	rts	; Exit function with C set if mem avail otherwise clear
-good:	sec
-	rts
-.endproc
-
-;*****************************************************************************
-; Restores the interrupt vector to the one saved by set_banked_isr
+; Restores the interrupt vector to the one saved by mm_set_isr
 ;=============================================================================
 ; No inputs
 ;-----------------------------------------------------------------------------
@@ -167,42 +132,40 @@ good:	sec
 ; Updates the ISR in lowram with the correct bank and address of the actual
 ; ISR, then installs the lowram ISR and ensures it calls the original ISR
 ;=============================================================================
-; Input:	A and X are low- and high-byte of banked ISR
-;		 - low-byte of the ZP address should contain the bank of ISR
+; Input:	.A & .Y = low- and high-byte of banked ISR
+;		.X = bank of ISR
 ;-----------------------------------------------------------------------------
+; Preserves:	.X
 ;*****************************************************************************
 .proc mm_set_isr: near
 	pha	; Save low-byte of ISR on stack as .A needs to be used
-	; Get RAM bank of ISR (stored in low-byte of ZP pointer)
-zp03:	lda	ZP
-	tay	; Store RAM bank in .Y
 	; Store lowram_addr in ZP pointer
 	lda	lowram_addr
-zp04:	sta	ZP
+zp03:	sta	$42
 	lda	lowram_addr+1
-zpp1:	sta	ZP+1
+zpp1:	sta	$42+1
 	pla	; Restore low-byte of ISR from stack
-	phy	; Preserve bank of ISR on stack
+	phy	; Preserve high-byte of ISR on stack
 	; Store low-byte of address for banked ISR
 	ldy	#_isr_addr
-zp05:	sta	(ZP),y
+zp04:	sta	($42),y
 	; Store high-byte of address for banked ISR
 	iny
-	txa
-zp06:	sta	(ZP),y
+	pla	; Load high-byte of ISR from stack
+zp05:	sta	($42),y
 	; Store bank# of banked ISR
 	ldy	#_isr_bank
-	pla	; Restore bank of ISR from stack
-zp07:	sta	(ZP),y
+	txa
+zp06:	sta	($42),y
 	; Save original interrupt vector
 	ldy	#_isr_orig
 	lda	X16_Vector_IRQ
 	sta	orig_isr
-zp08:	sta	(ZP),y
+zp07:	sta	($42),y
 	iny
 	lda	X16_Vector_IRQ+1
 	sta	orig_isr+1
-zp09:	sta	(ZP),y
+zp08:	sta	($42),y
 	; Install new interrupt vector
 	sei	; Disable interrupts
 	lda	lowram_addr
@@ -217,59 +180,29 @@ zp09:	sta	(ZP),y
 ; Sets correct ZP pointer in functions, copies functions to lowram
 ; and updates jumptable 
 ;=============================================================================
-; Arguments: A and X are low- and high-byte of lowram address reserved for
-;            the x16vision library
-;	     Y is the ZP address to use as pointer
+; Inputs:	.A & .X = low- & high-byte of lowram address reserved for
+;		the x16vision library.
+;		.Y = ZP address to use as pointer
 ;-----------------------------------------------------------------------------
-; 
+; Preserves:	.X
 ;*****************************************************************************
 .proc mm_init_lowram: near
 	; Save the lowram address
 	sta	lowram_addr
 	stx	lowram_addr+1
 
-	; Update all functions with chosen ZP pointer
-	sty	zp00+1
-	sty	zp01+1
-	sty	zp02+1
-	sty	mm_set_isr::zp03+1
-	sty	mm_set_isr::zp04+1
-	sty	mm_set_isr::zp05+1
-	sty	mm_set_isr::zp06+1
-	sty	mm_set_isr::zp07+1
-	sty	mm_set_isr::zp08+1
-	sty	mm_set_isr::zp09+1
-	sty	zp10+1
-	sty	zp11+1
-	sty	zp12+1
-	sty	zp13+1
-	sty	zp14+1
-	sty	zp15+1
-	sty	zp16+1
-	sty	zp17+1
-	sty	zp18+1
-	sty	mm_remaining::zp19+1
-	sty	mm_alloc::zp20+1
-	sty	mm_alloc::zp21+1
-	sty	mm_alloc::zp22+1
-	sty	check_space::zp23+1
-	iny
-	sty	zpp0+1
-	sty	mm_set_isr::zpp1+1
-	sty	mm_remaining::zpp2+1
-	sty	mm_alloc::zpp3+1
-	sty	check_space::zpp4+1
+	jsr	update_zp_pointers
 
-zp00:	sta	ZP
-zpp0:	stx	ZP+1
+zp00:	sta	$42
+zpp0:	stx	$42+1
 	; Copy routines to lowram
 	ldy	#(_end_lowram-_isr-1)	; Size of lowram segment
 loop:	lda	_isr,y
-zp01:	sta	(ZP),y
+zp01:	sta	($42),y
 	dey
 	bne	loop
 	lda	_isr
-zp02:	sta	(ZP)
+zp02:	sta	($42)
 	; Update jumptable
 	lda	#(_lda_bank-_isr)	; Offset of _lda_bank
 	clc
@@ -309,6 +242,128 @@ zp02:	sta	(ZP)
 	rts
 .endproc
 
+;*****************************************************************************
+; Check if requested amount of space is available in the specified bank
+; Maximum request size is 255 bytes
+;=============================================================================
+; Inputs:	.A = number of bytes 
+;		.X = bank
+; Output:	Carry set if the memory is available, otherwise clear
+;-----------------------------------------------------------------------------
+; Uses:		ZP pointer
+; Preserves:	.A & .X
+;*****************************************************************************
+.proc check_space: near
+	pha			; Save the number of bytes being requested
+	lda	#>REM_SPACE	; Set address $A000 in ZP pointer
+zp22:	stz	$42
+zpp4:	sta	$42+1
+	jsr	lday_bank	; Read available memory from bank
+	sta	scratch
+	sty	scratch+1
+	pla			; Restore bytes requested
+	ldy	scratch+1	; Check high-byte
+	bne	good
+	; Here, we know that high-byte is 0
+	pha			; Save on stack again
+	sta	scratch+1	; Store bytes requested to scratch and load
+	lda	scratch		; available bytes into A for CMP
+	cmp	scratch+1
+	pla			; Restore bytes requested
+	rts	; Exit function with C set if mem avail otherwise clear
+good:	sec
+	rts
+.endproc
+
+zp_table:
+	.word mm_init_lowram::zp00+1
+	.word mm_init_lowram::zp01+1
+	.word mm_init_lowram::zp02+1
+	.word mm_set_isr::zp03+1
+	.word mm_set_isr::zp04+1
+	.word mm_set_isr::zp05+1
+	.word mm_set_isr::zp06+1
+	.word mm_set_isr::zp07+1
+	.word mm_set_isr::zp08+1
+	.word zp09+1
+	.word zp10+1
+	.word zp11+1
+	.word zp12+1
+	.word zp13+1
+	.word zp14+1
+	.word zp15+1
+	.word zp16+1
+	.word zp17+1
+	.word mm_remaining::zp18+1
+	.word mm_alloc::zp19+1
+	.word mm_alloc::zp20+1
+	.word mm_alloc::zp21+1
+	.word check_space::zp22+1
+	.word $0000
+
+;*****************************************************************************
+; Update all ZeroPage pointers in the library with the ZeroPage pointer in .Y
+;=============================================================================
+; Inputs:	.Y = low-byte of ZP pointer to use
+;-----------------------------------------------------------------------------
+; Preserves:	.A, .X & .Y
+;*****************************************************************************
+.proc update_zp_pointers: near
+	pha
+	phx
+	sty	@zp0+1
+	sty	@zp1+1
+	iny
+	sty	@zpp0+1
+	dey
+	ldx	#0
+@loop:	lda	zp_table, x
+@zp0:	sta	$42
+	eor	zp_table+1, x
+	beq	@done
+	lda	zp_table+1, x
+@zpp0:	sta	$42+1
+	tya
+@zp1:	sta	($42)
+	inx
+	inx
+	bra	@loop
+@done:	
+	plx
+	pla
+	; Update all functions with chosen ZP pointer
+;	sty	mm_init_lowram::zp00+1
+;	sty	mm_init_lowram::zp01+1
+;	sty	mm_init_lowram::zp02+1
+;	sty	mm_set_isr::zp03+1
+;	sty	mm_set_isr::zp04+1
+;	sty	mm_set_isr::zp05+1
+;	sty	mm_set_isr::zp06+1
+;	sty	mm_set_isr::zp07+1
+;	sty	mm_set_isr::zp08+1
+;	sty	zp09+1
+;	sty	zp10+1
+;	sty	zp11+1
+;	sty	zp12+1
+;	sty	zp13+1
+;	sty	zp14+1
+;	sty	zp15+1
+;	sty	zp16+1
+;	sty	zp17+1
+;	sty	mm_remaining::zp18+1
+;	sty	mm_alloc::zp19+1
+;	sty	mm_alloc::zp20+1
+;	sty	mm_alloc::zp21+1
+;	sty	check_space::zp22+1
+	iny
+	sty	mm_init_lowram::zpp0+1
+	sty	mm_set_isr::zpp1+1
+	sty	mm_remaining::zpp2+1
+	sty	mm_alloc::zpp3+1
+	sty	check_space::zpp4+1
+	rts
+.endproc
+
 .segment "LOWRAM"
 ;*****************************************************************************
 ; The current RAM bank is saved, RAM bank set correctly and a jsr to ISR
@@ -337,12 +392,12 @@ _isr:
 ; Load a byte from banked RAM pointed to by ZP pointer LD_ST_BANK_PTR in bank
 ; specified by the value in .X
 ;=============================================================================
-; Arguments: LD_ST_BANK_PTR pointer to the memory address that should be read
-;            .X holds the RAM bank to read from
-;	     .Y holds offset from ZP pointer
+; Arguments:	ZP pointer to the memory address that should be read
+;		.X = the RAM bank to read from
+;		.Y = offset from ZP pointer
 ;-----------------------------------------------------------------------------
-; Preserves: .X, .Y, LD_ST_BANK_PTR and the RAM bank before call
-; Returns: .A contains the value read from memory
+; Preserves:	.X, .Y and the RAM bank before call
+; Returns:	.A = the value read from memory
 ;*****************************************************************************
 _lda_bank:
 	phx			; Preserve bank
@@ -352,20 +407,20 @@ _lda_bank:
 	phy			; Move original RAM bank from Y to X through stack
 	plx
 	ply			; Pull offset from stack
-zp10:	lda	(ZP),y		; Load value from address pointed to by ZP pointer
+zp09:	lda	($42),y		; Load value from address pointed to by ZP pointer
 	stx	X16_RAMBank_Reg	; Restore original RAM bank
 	plx			; Restore RAM bank from caller
 	rts
 
 ;*****************************************************************************
-; Load two bytes from banked RAM pointed to by ZP pointer LD_ST_BANK_PTR in
+; Load two bytes from banked RAM pointed to by $42 pointer LD_ST_BANK_PTR in
 ; bank specified by the value in .X
 ;=============================================================================
-; Arguments: LD_ST_BANK_PTR, pointer to the memory address that should be read
-;            .X holds the RAM bank to read from
+; Arguments:	ZP pointer to the memory address that should be read
+;		.X = the RAM bank to read from
 ;-----------------------------------------------------------------------------
-; Preserves: X & LD_ST_BANK_PTR
-; Returns: .A contains value from ZP pointer, .Y from ZP pointer + 1
+; Preserves:	.X
+; Returns:	.A = value from ZP pointer, .Y from ZP pointer + 1
 ;*****************************************************************************
 _lday_bank:
 	phx			; Preserve X
@@ -374,9 +429,9 @@ _lday_bank:
 	phy			; Move original RAM bank through stack to X
 	plx
 	ldy	#1		; Read highbyte into Y
-zp11:	lda	(ZP),y
+zp10:	lda	($42),y
 	tay
-zp12:	lda	(ZP); Read lowbyte into A
+zp11:	lda	($42); Read lowbyte into A
 	stx	X16_RAMBank_Reg	; Restore original RAM bank
 	plx			; Restore X
 	rts
@@ -385,23 +440,23 @@ zp12:	lda	(ZP); Read lowbyte into A
 ; Load three bytes from banked RAM pointed to by ZP pointer LD_ST_BANK_PTR in00
 ; bank specified by the value in .X
 ;=============================================================================
-; Arguments: LD_ST_BANK_PTR, pointer to the memory address that should be read
-;            .X holds the RAM bank to read from
+; Arguments:	ZP pointer to the memory address that should be read
+;		.X = the RAM bank to read from
 ;-----------------------------------------------------------------------------
-; Preserves: LD_ST_BANK_PTR and the RAM bank before call
-; Returns: .Y=ZP pointer, .X=ZP pointer+1, .A=ZP pointer+2
+; Preserves:	The RAM bank before call
+; Returns:	.Y=ZP pointer, .X=ZP pointer+1, .A=ZP pointer+2
 ;*****************************************************************************
 _ldyxa_bank:
 	ldy	X16_RAMBank_Reg	; Save current RAM bank
 	stx	X16_RAMBank_Reg	; Set new RAM bank
-zp13:	lda	(ZP)		; Load value from address pointed to by ZP pointer
+zp12:	lda	($42)		; Load value from address pointed to by ZP pointer
 	pha			; Save value to stack
 	phy			; Save RAM bank to stack
 	ldy	#1		; Initialize .Y for reading value through ZP pointer
-zp14:	lda	(ZP),y		; Load next value from address pointed to by ZP pointer with .Y
+zp13:	lda	($42),y		; Load next value from address pointed to by ZP pointer with .Y
 	tax			; Store value in .X
 	iny
-zp15:	lda	(ZP),y		; Load next value from address pointed to by ZP pointer with .Y
+zp14:	lda	($42),y		; Load next value from address pointed to by ZP pointer with .Y
 	ply			; Restore original RAM bank
 	sty	X16_RAMBank_Reg
 	ply			; Get first read value from stack
@@ -411,13 +466,13 @@ zp15:	lda	(ZP),y		; Load next value from address pointed to by ZP pointer with .
 ; Store a byte to banked RAM pointed to by ZP pointer LD_ST_BANK_PTR in bank
 ; specified by the value in .X
 ;=============================================================================
-; Arguments: LD_ST_BANK_PTR, pointer to memory address that should be written
-;            .X holds the RAM bank to write to
-;	     .A holds the value to write
-;	     .Y holds the offset to the ZP pointer to write to
+; Arguments:	ZP pointer to memory address that should be written
+;		.X = the RAM bank to write to
+;		.A = the value to write
+;		.Y = the offset to the ZP pointer to write to
 ;-----------------------------------------------------------------------------
-; Preserves: .A, .X, .Y, LD_ST_BANK_PTR and the RAM bank before call
-; Returns: nothing
+; Preserves: 	A, .X, .Y and the RAM bank before call
+; Returns:	nothing
 ;*****************************************************************************
 _sta_bank:
 	phx			; Preserve .X 
@@ -426,7 +481,7 @@ _sta_bank:
 	stx	X16_RAMBank_Reg	; Set new RAM bank
 	tax			; Move original RAM bank to .X
 	pla			; Restore value to write
-zp16:	sta	(ZP),y		; Store value in .A to address pointed to by ZP pointer
+zp15:	sta	($42),y		; Store value in .A to address pointed to by ZP pointer
 	stx	X16_RAMBank_Reg	; Restore RAM bank
 	plx			; Restore .X
 	rts
@@ -435,12 +490,12 @@ zp16:	sta	(ZP),y		; Store value in .A to address pointed to by ZP pointer
 ; Store two bytes to banked RAM pointed to by ZP pointer LD_ST_BANK_PTR in
 ; bank specified by the value in .X
 ;=============================================================================
-; Arguments: LD_ST_BANK_PTR, pointer to memory address that should be written
-;            .X holds the RAM bank to write to
-;	     .A & .Y holds the values to write in that order (low-high)
+; Arguments:	ZP pointer to memory address that should be written
+;		.X = the RAM bank to write to
+;		.A & .Y = the values to write in that order (low-high)
 ;-----------------------------------------------------------------------------
-; Preserves: A, X, Y, LD_ST_BANK_PTR & The RAM bank before call
-; Returns: nothing
+; Preserves:	.A, .X, .Y & The RAM bank before call
+; Returns:	nothing
 ;*****************************************************************************
 _stay_bank:
 	pha			; Preserve A register
@@ -450,10 +505,10 @@ _stay_bank:
 	plx			; Pull .low byte from stack and store it in .X temporarily
 	pha			; Push original RAM bank to stack
 	txa			; Move low byte from .X back to .A
-zp17:	sta	(ZP)		; Store low byte to address pointed to by ZP pointer
+zp16:	sta	($42)		; Store low byte to address pointed to by ZP pointer
 	tya			; Store high byte to address pointed to by ZP pointer with .Y added
 	ldy	#1
-zp18:	sta	(ZP),y
+zp17:	sta	($42),y
 	tay			; Restore high byte to Y
 	ldx	X16_RAMBank_Reg	; Restore RAM bank value from the call
 	pla			; Restore RAM bank to original
