@@ -9,7 +9,7 @@ SKIPIMPORT=1
 .segment "MEMMANBSS"
 lowram_addr:	.res	2
 orig_isr:	.res	2
-scratch:	.res	2
+scratch:	.res	6
 
 REM_SPACE=$A000
 FREE_ADDR=$A002
@@ -31,6 +31,14 @@ sta_bank:		; Store value in A					A=val, X=bank, Y=offset
 	jmp	$0000
 stay_bank:		; Store A to lowbyte, Y to highbyte			X=bank
 	jmp	$0000
+
+;*****************************************************************************
+;=============================================================================
+;-----------------------------------------------------------------------------
+;*****************************************************************************
+.proc mm_free: near
+	rts
+.endproc
 
 ;*****************************************************************************
 ; Return the number of available bytes in specified bank
@@ -261,6 +269,55 @@ zp02:	sta	($42)
 .endproc
 
 ;*****************************************************************************
+; Copy contents of banked memory region to other memory region in same bank
+;=============================================================================
+; Inputs:	.X = bank
+;		scratch+0 & scratch+1 = Pointer to source
+;		scratch+2 & scratch+3 = Pointer to destination
+;		scratch+4 & scratch+5 = Number of bytes to copy
+;-----------------------------------------------------------------------------
+; Preserves:	.X
+; Uses:		All 6 bytes of scratch are used as well as .A and .Y
+;*****************************************************************************
+.proc memcpy: near
+	ldy	#0
+loop:	; Write source address to ZP
+	lda	scratch+0
+zp24:	sta	$42
+	lda	scratch+1
+zpp7:	sta	$42+1
+	; Increment source address
+	inc	scratch+0
+	bne	:+
+	inc	scratch+1
+:	; Read byte and save on stack
+	jsr	lda_bank
+	pha
+	; Write destination address to ZP
+	lda	scratch+2
+zp25:	sta	$42
+	lda	scratch+3
+zpp8:	sta	$42+1
+	; Increment destination address
+	inc	scratch+2
+	bne	:+
+	inc	scratch+3
+:	; Restore byte from stack and write to pointer
+	pla
+	jsr	sta_bank
+	; Decrement counter
+	lda	scratch+4
+	bne	:+
+	dec	scratch+5
+:	dec	scratch+4
+	; Check if we have reached 0
+	dec
+	ora	scratch+5
+	bne	loop
+	rts
+.endproc
+
+;*****************************************************************************
 ; Check if requested amount of space is available in the specified bank
 ; Maximum request size is 255 bytes
 ;=============================================================================
@@ -318,6 +375,8 @@ zp_table:
 	.word mm_alloc::zp21+1
 	.word check_space::zp22+1
 	.word mm_alloc::zp23+1
+	.word memcpy::zp24+1
+	.word memcpy::zp25+1
 	.word $0000
 
 ;*****************************************************************************
@@ -382,6 +441,8 @@ zp_table:
 	sty	check_space::zpp4+1
 	sty	mm_alloc::zpp5+1
 	sty	mm_alloc::zpp6+1
+	sty	memcpy::zpp7+1
+	sty	memcpy::zpp8+1
 	rts
 .endproc
 
