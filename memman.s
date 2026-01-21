@@ -286,11 +286,7 @@ loop:	; Write source address to ZP
 zp24:	sta	$42
 	lda	scratch+1
 zpp7:	sta	$42+1
-	; Increment source address
-	inc	scratch+0
-	bne	:+
-	inc	scratch+1
-:	; Read byte and save on stack
+	; Read byte and save on stack
 	jsr	lda_bank
 	pha
 	; Write destination address to ZP
@@ -298,14 +294,15 @@ zpp7:	sta	$42+1
 zp25:	sta	$42
 	lda	scratch+3
 zpp8:	sta	$42+1
-	; Increment destination address
-	inc	scratch+2
-	bne	:+
-	inc	scratch+3
-:	; Restore byte from stack and write to pointer
+	; Restore byte from stack and write to pointer
 	pla
 	jsr	sta_bank
-	; Decrement counter
+	; Increment .Y as offset and high-byte of pointers if necessary
+	iny
+	bne	:+
+	inc	scratch+1
+	inc	scratch+3
+:	; Decrement counter
 	lda	scratch+4
 	bne	:+
 	dec	scratch+5
