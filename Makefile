@@ -18,7 +18,7 @@ default: all
 all: $(BIN)
 
 $(BIN): $(OBJS)
-	$(LD) $(LDFLAGS) -m $(MAPFILE) -Ln $(SYMFILE) -C x16vision.cfg $(OBJS) -o $@
+	$(LD) $(LDFLAGS) -m $(MAPFILE) -Ln $(SYMFILE) -C x16vision.cfg memman.o $(OBJS) -o $@
 
 %.o: %.s
 	$(AS) $(ASFLAGS) $(DEFINES) $< -o $@
