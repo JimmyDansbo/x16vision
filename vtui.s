@@ -34,6 +34,8 @@ vtui_getbank	= VTUI_LIB+56
 vtui_getstride	= _vtui_get_stride	; VTUI_LIB+59
 vtui_getdecr	= _vtui_get_stride	; VTUI_LIB+62
 
+tmpval:	.res 1
+
 _vtui_get_stride:
 	lda	Vera_Reg_AddrH
 	lsr
@@ -51,21 +53,17 @@ _vtui_gotoxy:
 	rts
 
 _vtui_setstride:
-@tmp = X16_Reg_X0L
-	phy			; Preserve Y
 	asl			; Stride is stored in upper nibble
 	asl
 	asl
 	asl
-	ldy	@tmp		; Preserve temporary ZP register
-	sta	@tmp		; Write stride value to memory for later comparison
+	sta	tmpval		; Write stride value to memory for later comparison
 	lda	Vera_Reg_AddrH	; Zero out upper nibble of VERA addr H
 	and	#$0F
-	ora	@tmp		; Write stride value to VERA addr H
+	ora	tmpval		; Write stride value to VERA addr H
 	sta	Vera_Reg_AddrH
-	sty	@tmp		; Restore ZP register
-	ply			; Restore Y
 	rts
+
 
 _vtui_setdecr:
 	lda	Vera_Reg_AddrH
@@ -90,7 +88,7 @@ _vtui_clrscr:
 _vtui_fillbox:
 @width = X16_Reg_R1L
 @height = X16_Reg_R2L
-@xcoord = X16_Reg_R0L
+@xcoord = tmpval
 	ldy	Vera_Reg_AddrL
 	sty	@xcoord
 @vloop:	ldy	@xcoord
