@@ -1,7 +1,7 @@
 .ifndef macros_inc
 macros_inc=1
 
-.macro DEBUG_STOP
+.macro DBG
 	.byte	$DB
 .endmacro
 
