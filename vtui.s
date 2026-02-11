@@ -7,6 +7,7 @@
 .export vtui_fillbox, vtui_pet2scr, vtui_scr2pet, vtui_border
 .export vtui_saverect, vtui_restrect, vtui_inputstr, vtui_getbank
 .export vtui_getstride, vtui_getdecr
+.export vtui_width, vtui_height
 
 ; ******************************* Functions ***********************************
 VTUI_LIB=*				; VTUI+2
@@ -20,7 +21,7 @@ vtui_clrscr	= _vtui_clrscr		; VTUI_LIB+14
 vtui_gotoxy	= _vtui_gotoxy		; VTUI_LIB+17
 vtui_plotchar	= VTUI_LIB+20
 vtui_scanchar	= VTUI_LIB+23
-vtui_hline	= VTUI_LIB+26
+vtui_hline	= _vtui_hline
 vtui_vline	= VTUI_LIB+29
 vtui_printstr	= VTUI_LIB+32
 vtui_fillbox	= _vtui_fillbox		; VTUI_LIB+35
@@ -34,7 +35,9 @@ vtui_getbank	= VTUI_LIB+56
 vtui_getstride	= _vtui_get_stride	; VTUI_LIB+59
 vtui_getdecr	= _vtui_get_stride	; VTUI_LIB+62
 
-tmpval:	.res 1
+tmpval:		.res 1
+vtui_width:	.res 1
+vtui_height:	.res 1
 
 _vtui_get_stride:
 	lda	Vera_Reg_AddrH
@@ -74,33 +77,36 @@ _vtui_setdecr:
 	rts
 
 _vtui_clrscr:
-@width = X16_Reg_R1L
-@height = X16_Reg_R2L
 	ldy	#$B0
 	sty	Vera_Reg_AddrM
 	stz	Vera_Reg_AddrL
 	ldy	#80
-	sty	@width
+	sty	vtui_width
 	ldy	#60
-	sty	@height
+	sty	vtui_height
 	; Fall through to fillbox
 
 _vtui_fillbox:
-@width = X16_Reg_R1L
-@height = X16_Reg_R2L
 @xcoord = tmpval
 	ldy	Vera_Reg_AddrL
 	sty	@xcoord
 @vloop:	ldy	@xcoord
 	sty	Vera_Reg_AddrL
-	ldy	@width
+	ldy	vtui_width
 @hloop:	sta	Vera_Reg_Data0
 	stx	Vera_Reg_Data0
 	dey
 	bne	@hloop
 	inc	Vera_Reg_AddrM
-	dec	@height
+	dec	vtui_height
 	bne	@vloop
+	rts
+
+_vtui_hline:
+	sta	Vera_Reg_Data0
+	stx	Vera_Reg_Data0
+	dey
+	bne	_vtui_hline
 	rts
 
 ; *****************************************************************************
