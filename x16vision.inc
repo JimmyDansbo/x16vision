@@ -20,7 +20,7 @@ XV_ERR_CORRUPT_HDR		= $05	; Memory area header corrupt
 XV_ERR_MODE_UNSUPPORTED		= $06	; The chosen screen mode is unsupported
 ; XV specific errors
 XV_ERR_CHARSET_UNSUPPORTED	= $07	; The current character set is not recognized as supported
-XV_ERR_NO_DESKTOP		= $08
+XV_ERR_NO_DESKTOP		= $08	; Desktop has not yet been initialized
 
 ; Memory stuctures
 XV_DESKTOP_DIRTY	= 0
