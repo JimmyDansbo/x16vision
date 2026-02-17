@@ -3,10 +3,6 @@
 .include "x16vision.inc"
 .include "memman.inc"
 
-.macro TEST
-.charmap $61, $01
-.endmacro
-
 .import __XVKITVARS_SIZE__, __XVKITVARS_LOAD__
 
 ; Imports from vtui.s
@@ -21,7 +17,7 @@
 X16VISION_VERSION	= $0001
 
 .segment "HEADER"
-; Variable holding the next free address in the bank
+; Variables holding the "header" of the mmb
 free_addr:	.res 2
 first_item:	.res 2
 id_bitmap:	.res 32
@@ -57,49 +53,44 @@ cp437_charset:	.byte $AA, $A9, $D9, $C0, $C4, $B3, $C2, $C1, $C3, $B4, $C5
 pet_charset:	.byte $6E, $70, $7D, $6D, $40, $42, $72, $71, $6B, $73, $5B
 
 ;*****************************************************************************
+; Create a menu bar and set the values for it
 ;=============================================================================
+; Inputs:	.A = Color
+;		.Y = Selected/Highlight color
+; Outputs:	.C set on error with errorcode in .A
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
 ;*****************************************************************************
-.proc _xv_menubar: near
-
-	lda	#80
-	ldy	#$B0+30
-	sta	$9F20
-	sty	$9F21
-	ldx	#$10
-	DBG
-	lda	#'@'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#']'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#'!'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#'?'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#'A'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#'a'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-	lda	#'0'
-	jsr	convert
-	sta	$9F23
-	stx	$9F23
-
-
+.proc	_xv_menubar: near
+	pha
+	phy
+	DESKTOP_PTR 2
+	; Desktop is now 1 line shorter because of the status bar
+	ldy	#XV_DESKTOP_HEIGHT
+	jsr	mm_lda_bank
+	dec
+	jsr	mm_sta_bank
+	; Desktop Y start is incremented by 1 line
+	iny	; XV_DESKTOP_Y_START
+	jsr	mm_lda_bank
+	inc
+	jsr	mm_sta_bank
+	; Update the select/highlight color
+	ldy	#XV_MENU_BAR_SEL_COLOR
+	pla
+	jsr	mm_sta_bank
+	; Update the normal color
+	dey	;XV_MENU_BAR_COLOR
+	pla
+	jsr	mm_sta_bank
+	; Update the dirty bit
+	dey	;XV_MENU_BAR_DIRTY
+	lda	#1
+	jsr	mm_sta_bank
+	clc
 	rts
 .endproc
+
 
 ;*****************************************************************************
 ; Convert ASCII character to screen code according to the selected
@@ -171,7 +162,7 @@ zeroloop:
 	dey
 	bne	zeroloop
 	jsr	mm_sta_bank
-	lda	#60
+	lda	#1
 	sta	jiffiecnt
 	stx	desktop_handle+0	; Store allocated Bank for later use
 	; Ensure that we get VSYNC interrupts from VERA
@@ -214,9 +205,9 @@ zeroloop:
 	clc
 	rts
 pet_uplo:
+	; Handle PET Upper/lower charsets
 	lda	#3		; Using PET-Up/Lo charset (#3 or #5)
 	sta	petcp
-	; Handle PET Upper/lower charsets
 	clc
 	rts
 unsupported:
@@ -240,11 +231,15 @@ unsupported:
 ;12: 1F380: 00 00 5c 62 62 5c 40 40	1F280:
 
 ;*****************************************************************************
+; Allocate memory for the desktop structure, save information about the
+; desktop and mark it as dirty to get it drawn by the interrupt handler
 ;=============================================================================
 ; Inputs:	.A = Background Character
 ;		.X = Background Color
 ;		.Y = Screen Mode
+; Outputs:	.C set on error with errorcode in .A
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
 ;*****************************************************************************
 .proc	_xv_desktop: near
 	pha	; Character
@@ -262,8 +257,6 @@ unsupported:
 	jsr	mm_get_ptr	; Get pointer to desktop structure
 	bcs	error
 	; Save the pointer
-;	sta	desktop_addr+0
-;	sty	desktop_addr+1
 	jsr	mm_store_zp1	; Set ZP pointer
 	; Zero allocated memory
 	ldy	#XV_DESKTOP_STRUCT_SIZE-1
@@ -304,6 +297,7 @@ zloop:	jsr	mm_sta_bank
 	ldy	#XV_DESKTOP_DIRTY
 	lda	#1
 	jsr	mm_sta_bank
+	clc
 	rts
 error:	ply	; Clear stack
 	ply
@@ -312,28 +306,70 @@ error:	ply	; Clear stack
 .endproc
 
 ;*****************************************************************************
+; Create a status bar and set the values for it
 ;=============================================================================
+; Inputs:	.A = Color
+;		.Y = Selected/Highlight color
+; Outputs:	.C set on error with errorcode in .A
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
+;*****************************************************************************
+.proc	_xv_statusbar: near
+	pha
+	phy
+	DESKTOP_PTR 2
+	; Desktop is now 1 line shorter because of the status bar
+	ldy	#XV_DESKTOP_HEIGHT
+	jsr	mm_lda_bank
+	dec
+	jsr	mm_sta_bank
+	; Update the select/highlight color
+	ldy	#XV_STATUS_SEL_COLOR
+	pla
+	jsr	mm_sta_bank
+	; Update the normal color
+	dey	;XV_STATUS_COLOR
+	pla
+	jsr	mm_sta_bank
+	; Update the dirty bit
+	dey	;XV_STATUS_DIRTY
+	lda	#1
+	jsr	mm_sta_bank
+	clc
+	rts
+.endproc
+
+;*****************************************************************************
+; Update library time keeping variables from RTC
+;=============================================================================
+; Inputs:	None
+; Outputs:	Library variables are updated from RTC if necessary
+;-----------------------------------------------------------------------------
+; Uses:		.A, .X & .Y
 ;*****************************************************************************
 .proc update_time: near
 	ldx	#X16_I2C_RTC
 	ldy	#X16_RTCReg_ClockSeconds
 	jsr	X16_Kernal_i2c_read_byte
-	and	#$7F
+	and	#$7F	; Reset bit7 of seconds (for some reason RTC sets it)
 retry:	sta	second
 	iny	; 1 minutes
 	jsr	X16_Kernal_i2c_read_byte
+	ldy	#0	; If month is zero, it is first time function is called
+	cpy	month
+	beq	:+	; Don't compare against existing minute first time
 	cmp	minute
-	bne	:+
-	rts
+	beq	end	; If minute has not changed, end the function
 :	sta	minute
-	iny	; 2 hours
+	ldy	#X16_RTCReg_ClockHours
 	jsr	X16_Kernal_i2c_read_byte
+	ldy	#0	; If month is zero, it is first time function is called
+	cpy	month
+	beq	:+	; Don't compare against existing hour first time
 	cmp	hour
-	bne	:+
-	rts
+	beq	end	; If hour has not changed, end the function
 :	sta	hour
-	iny	; 3 weekday
+	ldy	#X16_RTCReg_ClockWeekday
 	jsr	X16_Kernal_i2c_read_byte
 	sta	weekday
 	iny	; 4 day of month
@@ -345,7 +381,8 @@ retry:	sta	second
 	iny	; 6 year
 	jsr	X16_Kernal_i2c_read_byte
 	sta	year
-	ldy	#X16_RTCReg_ClockSeconds
+	; Ensure that seconds have not changed while updating other values
+end:	ldy	#X16_RTCReg_ClockSeconds
 	jsr	X16_Kernal_i2c_read_byte
 	and	#$7F
 	cmp	second
@@ -354,20 +391,15 @@ retry:	sta	second
 .endproc
 
 ;*****************************************************************************
+; Redraw desktop if it is needed (dirty)
 ;=============================================================================
 ; Output:	.C clear if update work has been done
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
 ;*****************************************************************************
 .proc update_desktop: near
 	; Set memory bank and ZP pointer
-	lda	desktop_handle+0	; If desktop handle has not yet been set, quit
-	bne	:+
-	lda	#XV_ERR_NO_DESKTOP
-	sec
-	rts
-:	ldy	desktop_handle+1
-	jsr	mm_get_ptr
-	jsr	mm_store_zp1
+	DESKTOP_PTR
 	; Check if desktop needs to be redrawn
 	ldy	#XV_DESKTOP_DIRTY
 	jsr	mm_lda_bank
@@ -401,73 +433,25 @@ retry:	sta	second
 .endproc
 
 ;*****************************************************************************
-; Create a status bar and set the values for it
-;=============================================================================
-; Inputs:	.A = Color
-;		.Y = Selected/Highlight color
-;-----------------------------------------------------------------------------
-;*****************************************************************************
-.proc	_xv_statusbar: near
-	pha
-	phy
-	lda	desktop_handle+0
-	bne	:+
-	ply		; Clear stack
-	ply
-	lda	#XV_ERR_NO_DESKTOP
-	sec
-	rts
-:	ldy	desktop_handle+1
-	jsr	mm_get_ptr
-	bcc	:+
-	ply		; Clear stack
-	ply
-	rts
-:	jsr	mm_store_zp1
-	; Desktop is now 1 line shorter because of the status bar
-	ldy	#XV_DESKTOP_HEIGHT
-	jsr	mm_lda_bank
-	dec
-	jsr	mm_sta_bank
-	; Update the select/highlight color
-	ldy	#XV_STATUS_SEL_COLOR
-	pla
-	jsr	mm_sta_bank
-	; Update the normal color
-	dey	;XV_STATUS_COLOR
-	pla
-	jsr	mm_sta_bank
-	; Update the dirty bit
-	dey	;XV_STATUS_DIRTY
-	lda	#1
-	jsr	mm_sta_bank
-	rts
-.endproc
-
-;*****************************************************************************
+; Redraw status bar if it is needed (dirty)
 ;=============================================================================
 ; Output:	.C clear if update work has been done
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
 ;*****************************************************************************
 .proc update_statusbar: near
-	lda	desktop_handle+0
-	bne	:+
-	lda	#XV_ERR_NO_DESKTOP
-	sec
-	rts
-:	ldy	desktop_handle+1
-	jsr	mm_get_ptr
-	bcc	:+
-	rts
-:	jsr	mm_store_zp1
+	DESKTOP_PTR
 	ldy	#XV_STATUS_DIRTY
 	jsr	mm_lda_bank
 	bne	:+
 	sec
 	rts
 :	ldy	#XV_DESKTOP_HEIGHT
-	jsr	mm_lda_bank
-	tay
+	jsr	mm_lday_bank
+	cpy	#1
+	bne	:+
+	inc
+:	tay
 	lda	#0
 	jsr	vtui_gotoxy
 	ldy	#XV_DESKTOP_WIDTH
@@ -488,8 +472,45 @@ retry:	sta	second
 .endproc
 
 ;*****************************************************************************
+; Redraw menu bar if it is needed (dirty)
 ;=============================================================================
+; Output:	.C clear if update work has been done
 ;-----------------------------------------------------------------------------
+; Preserves:	Nothing
+;*****************************************************************************
+.proc update_menubar: near
+	DESKTOP_PTR
+	ldy	#XV_MENU_BAR_DIRTY
+	jsr	mm_lda_bank
+	bne	:+
+	sec
+	rts
+:	lda	#0
+	ldy	#0
+	jsr	vtui_gotoxy
+	ldy	#XV_DESKTOP_WIDTH
+	jsr	mm_lda_bank
+	pha		; Width
+	ldy	#XV_MENU_BAR_COLOR
+	jsr	mm_lda_bank
+	pha		; Color
+	dey	;XV_MENU_BAR_DIRTY
+	lda	#0
+	jsr	mm_sta_bank
+	plx		; Color
+	ply		; Width
+	lda	#' '
+	jsr	vtui_hline
+	clc
+	rts
+.endproc
+
+;*****************************************************************************
+; Update dirty elements
+;=============================================================================
+; All registers and ZP1 are preserved by the calling ISR
+;-----------------------------------------------------------------------------
+; Depends:	Needs access to the global jiffiecnt variable
 ;*****************************************************************************
 .proc	xv_tick: near
 	lda	Vera_Reg_ISR
@@ -506,6 +527,8 @@ retry:	sta	second
 :	jsr	update_desktop
 	bcc	done
 	jsr	update_statusbar
+	bcc	done
+	jsr	update_menubar
 	bcc	done
 done:	stz	Vera_Reg_DCBorder
 end:	rts
