@@ -24,4 +24,16 @@ macros_inc=1
 :	jsr	mm_store_zp1
 .endmacro
 
+.macro DATA1_ADDR addr
+	lda	#1
+	sta	Vera_Reg_Ctrl	; Set ADDRSEL to 1
+	lda	#$10|^addr	; Ensure increment is 1 and set VRAM address bit 16
+	sta	Vera_Reg_AddrH
+	lda	#>addr
+	sta	Vera_Reg_AddrM
+	lda	#<addr
+	sta	Vera_Reg_AddrL
+	stz	Vera_Reg_Ctrl	; Set ADDRSEL back to 0
+.endmacro
+
 .endif
