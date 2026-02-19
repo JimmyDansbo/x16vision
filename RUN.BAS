@@ -1,0 +1,3 @@
+10 LOAD"TEST.PRG",8
+20 RUN
+
