@@ -13,3 +13,6 @@
 *.prg
 *.PRG
 
+# SD card images
+*.img
+*.IMG
