@@ -1,43 +1,116 @@
 .segment "VTUI"
 .include "x16.inc"
 
-.export vtui_initialize, vtui_screenset, vtui_setbank, vtui_setstride
-.export vtui_setdecr, vtui_clrscr, vtui_gotoxy, vtui_plotchar
-.export vtui_scanchar, vtui_hline, vtui_vline, vtui_printstr
-.export vtui_fillbox, vtui_pet2scr, vtui_scr2pet, vtui_border
-.export vtui_saverect, vtui_restrect, vtui_inputstr, vtui_getbank
-.export vtui_getstride, vtui_getdecr
+.export vtui_setbank, vtui_setstride, vtui_setdecr, vtui_clrscr
+.export vtui_gotoxy, vtui_plotchar, vtui_scanchar, vtui_hline
+.export vtui_vline, vtui_fillbox, vtui_saverect, vtui_restrect
+.export vtui_getbank, vtui_getstride, vtui_getdecr
 .export vtui_width, vtui_height
 
 ; ******************************* Functions ***********************************
-VTUI_LIB=*				; VTUI+2
-
-vtui_initialize	= VTUI_LIB+0
-vtui_screenset	= VTUI_LIB+2
-vtui_setbank	= VTUI_LIB+5
-vtui_setstride	= _vtui_setstride	; VTUI_LIB+8
-vtui_setdecr	= _vtui_setdecr		; VTUI_LIB+11
-vtui_clrscr	= _vtui_clrscr		; VTUI_LIB+14
-vtui_gotoxy	= _vtui_gotoxy		; VTUI_LIB+17
-vtui_plotchar	= VTUI_LIB+20
-vtui_scanchar	= VTUI_LIB+23
+vtui_setbank	= _vtui_setbank
+vtui_setstride	= _vtui_setstride
+vtui_setdecr	= _vtui_setdecr
+vtui_clrscr	= _vtui_clrscr
+vtui_gotoxy	= _vtui_gotoxy
+vtui_plotchar	= _vtui_plotchar
+vtui_scanchar	= _vtui_scanchar
 vtui_hline	= _vtui_hline
-vtui_vline	= VTUI_LIB+29
-vtui_printstr	= VTUI_LIB+32
-vtui_fillbox	= _vtui_fillbox		; VTUI_LIB+35
-vtui_pet2scr	= VTUI_LIB+38
-vtui_scr2pet	= VTUI_LIB+41
-vtui_border	= VTUI_LIB+44
-vtui_saverect	= VTUI_LIB+47
-vtui_restrect	= VTUI_LIB+50
-vtui_inputstr	= VTUI_LIB+53
-vtui_getbank	= VTUI_LIB+56
-vtui_getstride	= _vtui_get_stride	; VTUI_LIB+59
-vtui_getdecr	= _vtui_get_stride	; VTUI_LIB+62
+vtui_vline	= _vtui_vline
+vtui_fillbox	= _vtui_fillbox
+vtui_saverect	= _vtui_saverect
+vtui_restrect	= _vtui_restorerect
+vtui_getbank	= _vtui_getbank
+vtui_getstride	= _vtui_get_stride
+vtui_getdecr	= _vtui_get_stride
 
 tmpval:		.res 1
 vtui_width:	.res 1
 vtui_height:	.res 1
+
+_vtui_saverect:
+	lda	Vera_Reg_AddrL
+	sta	tmpval
+@outer:	phx
+@inner:	lda	Vera_Reg_Data0
+	sta	Vera_Reg_Data1
+	lda	Vera_Reg_Data0
+	sta	Vera_Reg_Data1
+	dex
+	bne	@inner
+	lda	tmpval
+	sta	Vera_Reg_AddrL
+	inc	Vera_Reg_AddrM
+	plx
+	dey
+	bne	@outer
+	rts
+
+_vtui_restorerect:
+	lda	Vera_Reg_AddrL
+	sta	tmpval
+@outer:	phx
+@inner:	lda	Vera_Reg_Data1
+	sta	Vera_Reg_Data0
+	lda	Vera_Reg_Data1
+	sta	Vera_Reg_Data0
+	dex
+	bne	@inner
+	lda	tmpval
+	sta	Vera_Reg_AddrL
+	inc	Vera_Reg_AddrM
+	plx
+	dey
+	bne	@outer
+	rts
+
+_vtui_vline:
+	sta	Vera_Reg_Data0
+	pha
+	lda	Vera_Reg_AddrH
+	and	#$F8
+	cmp	#$10
+	bne	:+
+	stx	Vera_Reg_Data0
+:	dec	Vera_Reg_AddrL
+	dec	Vera_Reg_AddrL
+	inc	Vera_Reg_AddrM
+	pla
+	dey
+	bne	_vtui_vline
+	rts
+
+_vtui_plotchar:
+	sta	Vera_Reg_Data0
+	lda	Vera_Reg_AddrH
+	and	#$F8
+	cmp	#$10
+	bne	:+
+	stx	Vera_Reg_Data0
+:	rts
+
+_vtui_scanchar:
+	ldy	Vera_Reg_Data0
+	lda	Vera_Reg_AddrH
+	and	#$F8
+	cmp	#$10
+	bne	:+
+	ldx	Vera_Reg_Data0
+:	tya
+	rts
+
+_vtui_getbank:
+	lda	Vera_Reg_AddrH
+	lsr
+	rts
+
+_vtui_setbank:
+	lda	Vera_Reg_AddrH
+	ora	#$01
+	bcs	@end
+	and	#$FE
+@end:	sta	Vera_Reg_AddrH
+	rts
 
 _vtui_get_stride:
 	lda	Vera_Reg_AddrH
