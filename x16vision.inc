@@ -9,6 +9,8 @@ xv_desktop	= $A02D ; Create the desktop, set screen, charset, background pattern
 xv_statusbar	= $A030	; Create a status bar
 xv_menubar	= $A033 ; Create a menu bar
 
+DEST_VRAM	= $18A80; Last 9600 bytes of sprite memory area in VERA
+
 ; Error codes
 XV_NOERR			= $00
 ; Below codes are copied directly from memory manager
