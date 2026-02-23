@@ -7,6 +7,9 @@
 X16_RAMBank_Reg		= $00
 X16_PTR_0		= $30
 
+XV_PTR1 = $28
+XV_PTR2 = $2A
+XV_BANK = $10
 
 xv_name:	!text "x16vision.bin"
 end_xv_name:
@@ -18,21 +21,21 @@ main:
 	lda	#3		; Set CP437 charset
 	jsr	$FF62
 
-	lda	#$10
+	lda	#XV_BANK
 	sta	X16_RAMBank_Reg
 	jsr	load_headerless
-	stx	$2A		; Store next free address in ZP
-	sty	$2B
+	stx	XV_PTR2+0		; Store next free address in ZP
+	sty	XV_PTR2+1
 	; Store lowram address in ZP
 	lda	#<library_lowram
-	sta	$28
+	sta	XV_PTR1+0
 	lda	#>library_lowram
-	sta	$29
-	lda	#$28		; ZP1 is going to be $28 & $29
-	ldy	#$2A		; ZP2 is going to be $2A & $2B
-	ldx	#$10
-
+	sta	XV_PTR1+1
+	lda	#XV_PTR1	; ZP1 is going to be $28 & $29
+	ldy	#XV_PTR2	; ZP2 is going to be $2A & $2B
+	ldx	#XV_BANK
 	jsr	xv_initialize
+
 	lda	#$69	; Character
 	ldx	#$E1	; Color
 	ldy	#0	; Mode
@@ -47,16 +50,21 @@ main:
 	sty	$9F25
 
 	lda	#$F0	; Normal color
-	ldy	#$F2	; highlight color
+	ldy	#$D2	; highlight color
 
 	jsr	xv_statusbar
 	
 	lda	#$C0	; Normal color
-	ldy	#$C2	; highlight color
+	ldy	#$D2	; highlight color
 
 	jsr	xv_menubar
 
-	jsr	bleh
+	lda	#<mystr
+	sta	XV_PTR2
+	lda	#>mystr
+	sta	XV_PTR2
+	ldx	#XV_BANK
+	jsr	xv_statusitem
 
 -	wai
 	bra	-
@@ -67,7 +75,8 @@ main:
 
 library_lowram:	!fill 256, $00
 
-mystr		!fill 20, $00
+mystr:		!byte 5
+		!text "hello"
 
 load_headerless:
 	lda	#1
