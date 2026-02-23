@@ -2,12 +2,16 @@
 ; To call any of the routines, switch to the bank where code
 ; is loaded, then jsr to the routine
 
-xv_initialize	= $A024 ; Initialize the library
-xv_setisr	= $A027 ; Install interrupt handler
-xv_clearisr	= $A02A	; Restore old interrupt handler
-xv_desktop	= $A02D ; Create the desktop, set screen, charset, background pattern and color
-xv_statusbar	= $A030	; Create a status bar
-xv_menubar	= $A033 ; Create a menu bar
+xv_initialize		= $A024 ; Initialize the library
+xv_setisr		= $A027 ; Install interrupt handler
+xv_clearisr		= $A02A	; Restore old interrupt handler
+xv_desktop		= $A02D ; Create the desktop, set screen, charset, background pattern and color
+xv_statusbar		= $A030	; Create a status bar
+xv_menubar		= $A033 ; Create a menu bar
+xv_no_menubar		= $A036	; Remove menu bar and all children
+xv_no_statusbar		= $A039 ; Remove status bar and all children
+xv_no_desktop		= $A03C	; Remove desktop and all children
+xv_statusitem		= $A03F ; Create new item on the status bar
 
 DEST_VRAM	= $18A80; Last 9600 bytes of sprite memory area in VERA
 
@@ -42,6 +46,13 @@ XV_STATUS_COLOR		= 16
 XV_STATUS_SEL_COLOR	= 17
 XV_STATUS_FIRST_ITEM	= 18
 XV_DESKTOP_STRUCT_SIZE	= 20
+
+XV_STATUS_ITM_STRING	= 0
+XV_STATUS_ITM_CODE	= 2
+XV_STATUS_ITM_CMD	= 3
+XV_STATUS_ITM_NEXT	= 4
+XV_STATUS_ITM_SIZE	= 6
+
 
 ; General information for all elements
 XV_ELEM_TYPE		= 0

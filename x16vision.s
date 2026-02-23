@@ -6,7 +6,7 @@
 .import __XVKITVARS_SIZE__, __XVKITVARS_LOAD__
 
 ; Imports from x16internals.s
-.import desktop_handle, jiffiecnt, xv_tick
+.import desktop_handle, xv_tick
 .import scr_width, scr_height, petcp
 
 ; Imports from vtui.s
@@ -25,14 +25,77 @@ first_item:	.res 2
 id_bitmap:	.res 32
 
 .segment "JUMPTABLE"
-	jmp	_xv_initialize	; $A024
-	jmp	mm_set_isr	; $A027
-	jmp	mm_clear_isr	; $A02A
-	jmp	_xv_desktop	; $A02D
-	jmp	_xv_statusbar	; $A030
-	jmp	_xv_menubar	; $A033
+	jmp	_xv_initialize		; $A024
+	jmp	mm_set_isr		; $A027
+	jmp	mm_clear_isr		; $A02A
+	jmp	_xv_desktop		; $A02D
+	jmp	_xv_statusbar		; $A030
+	jmp	_xv_menubar		; $A033
+	jmp	_xv_no_menubar		; $A036
+	jmp	_xv_no_statusbar	; $A039
+	jmp	_xv_no_desktop		; $A03C
+	jmp	_xv_statusitem		; $A03F
 
 .segment "XVKITLIB"
+
+;*****************************************************************************
+; Create a status item by allocating memory for it and returning the handle
+;=============================================================================
+; Inputs:	ZP2 = Pointer to string
+;		.X = RAM Bank of string
+;		.A = Shortcut code
+;		.Y = Shortcut command
+;-----------------------------------------------------------------------------
+;*****************************************************************************
+.proc _xv_statusitem: near
+	pha
+	phy
+	phx
+	DESKTOP_PTR 3
+	ldy	#XV_STATUS_FIRST_ITEM
+	jsr	mm_lday_bank
+	cmp	#0
+	beq	
+
+	rts
+.endproc
+
+;*****************************************************************************
+;=============================================================================
+;-----------------------------------------------------------------------------
+;*****************************************************************************
+.proc _xv_no_menubar: near
+	DESKTOP_PTR
+	; Desktop is now 1 line longer as the menu bar is no longer there
+	ldy	#XV_DESKTOP_HEIGHT
+	jsr	mm_lda_bank
+	inc
+	jsr	mm_sta_bank
+	; Desktop Y is reset to zero
+	iny	; XV_DESKTOP_Y_START
+	lda	#0
+	jsr	mm_sta_bank
+	; Reset colors to 0
+	ldy	#XV_MENU_BAR_SEL_COLOR
+	jsr	mm_sta_bank
+	dey	; XV_MENU_BAR_COLOR
+	jsr	mm_sta_bank
+	dey	; XV_MENU_BAR_DIRTY
+	jsr	mm_sta_bank
+
+	; Handle items on the menubar
+
+	lda	#0
+	ldy	#XV_MENU_BAR_FIRST_ITEM
+	jsr	mm_sta_bank
+	iny
+	jsr	mm_sta_bank
+	ldy	#XV_DESKTOP_DIRTY
+	lda	#1
+	jsr	mm_sta_bank
+	clc
+	rts
+.endproc
 
 ;*****************************************************************************
 ; Create a menu bar and set the values for it
@@ -47,15 +110,14 @@ id_bitmap:	.res 32
 	pha
 	phy
 	DESKTOP_PTR 2
-	; Desktop is now 1 line shorter because of the status bar
+	; Desktop is now 1 line shorter because of the menu bar
 	ldy	#XV_DESKTOP_HEIGHT
 	jsr	mm_lda_bank
 	dec
 	jsr	mm_sta_bank
-	; Desktop Y start is incremented by 1 line
+	; Desktop Y start is set to 1
 	iny	; XV_DESKTOP_Y_START
-	jsr	mm_lda_bank
-	inc
+	lda	#1
 	jsr	mm_sta_bank
 	; Update the select/highlight color
 	ldy	#XV_MENU_BAR_SEL_COLOR
@@ -68,6 +130,40 @@ id_bitmap:	.res 32
 	; Update the dirty bit
 	dey	;XV_MENU_BAR_DIRTY
 	lda	#1
+	jsr	mm_sta_bank
+	clc
+	rts
+.endproc
+
+;*****************************************************************************
+;=============================================================================
+;-----------------------------------------------------------------------------
+;*****************************************************************************
+.proc _xv_no_statusbar: near
+	DESKTOP_PTR
+	; Desktop is no 1 line longer because there is no longer a status bar
+	ldy	#XV_DESKTOP_HEIGHT
+	jsr	mm_lda_bank
+	inc
+	jsr	mm_sta_bank
+	; Reset information to zero
+	lda	#0
+	ldy	#XV_STATUS_SEL_COLOR
+	jsr	mm_sta_bank
+	dey	; XV_STATUS_COLOR
+	jsr	mm_sta_bank
+	dey	; XV_STAUS_DIRTY
+	jsr	mm_sta_bank
+
+	; Handle status bar items
+
+	lda	#0
+	ldy	#XV_DESKTOP_FIRST_WIN
+	jsr	mm_sta_bank
+	iny
+	jsr	mm_sta_bank
+	lda	#1
+	ldy	#XV_DESKTOP_DIRTY
 	jsr	mm_sta_bank
 	clc
 	rts
@@ -104,6 +200,29 @@ id_bitmap:	.res 32
 	lda	#1
 	jsr	mm_sta_bank
 	clc
+	rts
+.endproc
+
+;*****************************************************************************
+;=============================================================================
+;-----------------------------------------------------------------------------
+;*****************************************************************************
+.proc _xv_no_desktop: near
+	jsr	_xv_no_menubar
+	bcc	:+
+	rts
+:	jsr	_xv_no_statusbar
+	bcc	:+
+	rts
+:	
+	; Handle children
+
+	lda	desktop_handle
+	ldy	desktop_handle+1
+	clc
+	jsr	mm_free
+	stz	desktop_handle
+	stz	desktop_handle+1
 	rts
 .endproc
 
@@ -209,8 +328,6 @@ zeroloop:
 	dey
 	bne	zeroloop
 	jsr	mm_sta_bank
-	lda	#1
-	sta	jiffiecnt
 	stx	desktop_handle+0	; Store allocated Bank for later use
 	; Ensure that we get VSYNC interrupts from VERA
 	lda	Vera_Reg_IEN
