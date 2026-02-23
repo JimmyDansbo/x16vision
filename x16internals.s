@@ -3,7 +3,7 @@
 .include "x16vision.inc"
 .include "memman.inc"
 
-.export desktop_handle, jiffiecnt, xv_tick
+.export desktop_handle, xv_tick
 .export scr_width, scr_height, petcp
 
 ; Imports from vtui.s
@@ -16,14 +16,6 @@
 .segment "XVKITVARS"
 desktop_handle:	.res 2
 petcp:		.res 1
-jiffiecnt:	.res 1
-year:		.res 1
-month:		.res 1
-day:		.res 1
-weekday:	.res 1
-hour:		.res 1
-minute:		.res 1
-second:		.res 1
 
 .segment "XVKITLIB"
 scr_width:	.byte 80,80,40,40,40,20,20,22,64,64,32,32
@@ -151,57 +143,6 @@ pet_charset:	.byte $6E, $70, $7D, $6D, $40, $42, $72, $71, $6B, $73, $5B
 .endproc
 
 ;*****************************************************************************
-; Update library time keeping variables from RTC
-;=============================================================================
-; Inputs:	None
-; Outputs:	Library variables are updated from RTC if necessary
-;-----------------------------------------------------------------------------
-; Uses:		.A, .X & .Y
-;*****************************************************************************
-.proc update_time: near
-	ldx	#X16_I2C_RTC
-	ldy	#X16_RTCReg_ClockSeconds
-	jsr	X16_Kernal_i2c_read_byte
-	and	#$7F	; Reset bit7 of seconds (for some reason RTC sets it)
-retry:	sta	second
-	iny	; 1 minutes
-	jsr	X16_Kernal_i2c_read_byte
-	ldy	#0	; If month is zero, it is first time function is called
-	cpy	month
-	beq	:+	; Don't compare against existing minute first time
-	cmp	minute
-	beq	end	; If minute has not changed, end the function
-:	sta	minute
-	ldy	#X16_RTCReg_ClockHours
-	jsr	X16_Kernal_i2c_read_byte
-	ldy	#0	; If month is zero, it is first time function is called
-	cpy	month
-	beq	:+	; Don't compare against existing hour first time
-	cmp	hour
-	beq	end	; If hour has not changed, end the function
-:	sta	hour
-	ldy	#X16_RTCReg_ClockWeekday
-	jsr	X16_Kernal_i2c_read_byte
-	sta	weekday
-	iny	; 4 day of month
-	jsr	X16_Kernal_i2c_read_byte
-	sta	day
-	iny	; 5 month
-	jsr	X16_Kernal_i2c_read_byte
-	sta	month
-	iny	; 6 year
-	jsr	X16_Kernal_i2c_read_byte
-	sta	year
-	; Ensure that seconds have not changed while updating other values
-end:	ldy	#X16_RTCReg_ClockSeconds
-	jsr	X16_Kernal_i2c_read_byte
-	and	#$7F
-	cmp	second
-	bne	retry
-	rts
-.endproc
-
-;*****************************************************************************
 ; Convert ASCII character to screen code according to the selected
 ; character set
 ;=============================================================================
@@ -258,12 +199,7 @@ noconv:	ply
 	lda	#2
 	sta	Vera_Reg_DCBorder
 	; Handle VSYNC Interrupt
-	dec	jiffiecnt
-	bne	:+
-	lda	#60
-	sta	jiffiecnt
-	jsr	update_time
-:	jsr	update_desktop
+	jsr	update_desktop
 	bcc	done
 	jsr	update_statusbar
 	bcc	done
